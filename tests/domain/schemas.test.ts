@@ -3,6 +3,11 @@ import { describe, expect, it } from "vitest";
 import { createApiResultSchema } from "@/domain/api-result";
 import { ClassificationSchema } from "@/domain/classification";
 import { GroundedReplySchema, ResolutionProposalSchema } from "@/domain/grounded-reply";
+import {
+  PersistedResolutionRunSchema,
+  ResolutionExecutionSchema,
+} from "@/domain/resolution-run";
+import { SourceDetailSchema } from "@/domain/source";
 import { TicketInputSchema } from "@/domain/ticket";
 
 const traceId = "123e4567-e89b-42d3-a456-426614174000";
@@ -108,5 +113,80 @@ describe("grounded reply schemas", () => {
   it.each(["retrieval_unavailable", "insufficient_evidence"])("allows the %s API error code", (code) => {
     const schema = createApiResultSchema(ResolutionProposalSchema);
     expect(schema.safeParse({ ok: false, traceId, error: { code, message: "Safe message", retryable: false } }).success).toBe(true);
+  });
+});
+
+describe("source and resolution-run schemas", () => {
+  const source = {
+    chunkId: "223e4567-e89b-42d3-a456-426614174000",
+    sourceId: "duplicate-charges",
+    title: "Duplicate charges",
+    section: "Review",
+    content: "Exact synthetic evidence.",
+  };
+
+  it("allows only bounded display-safe source fields", () => {
+    expect(SourceDetailSchema.safeParse(source).success).toBe(true);
+    expect(SourceDetailSchema.safeParse({ ...source, embedding: [1] }).success).toBe(false);
+    expect(SourceDetailSchema.safeParse({ ...source, content: "x".repeat(20_001) }).success).toBe(false);
+  });
+
+  it("validates a successful run without raw ticket text", () => {
+    const run = {
+      traceId,
+      sessionHash: "a".repeat(64),
+      ticketHash: "b".repeat(64),
+      classification: { category: "billing", priority: "medium", summary: "Duplicate", confidence: 0.9 },
+      action: { type: "reply" },
+      citedSources: [{ ...source, citationPosition: 0 }],
+      metadata: {
+        promptVersions: { classification: "classify.v1", resolution: "resolve.v1" },
+        provider: "anthropic",
+        model: "test-model",
+        latencyMs: 10,
+        inputTokens: 20,
+        outputTokens: 10,
+        retryCount: 0,
+        validationPassed: true,
+      },
+    };
+    expect(PersistedResolutionRunSchema.safeParse(run).success).toBe(true);
+    expect(PersistedResolutionRunSchema.safeParse({ ...run, ticketText: "raw" }).success).toBe(false);
+    expect(PersistedResolutionRunSchema.safeParse({ ...run, metadata: { ...run.metadata, latencyMs: -1 } }).success).toBe(false);
+  });
+
+  it("requires cited snapshots to match public citations in the same order", () => {
+    const citation = {
+      chunkId: source.chunkId,
+      sourceId: source.sourceId,
+      section: source.section,
+      claim: "The exact evidence supports this claim.",
+    };
+    const execution = {
+      proposal: {
+        category: "billing",
+        priority: "medium",
+        summary: "Duplicate",
+        confidence: 0.9,
+        groundedReply: { suggestedResponse: "A draft.", citations: [citation] },
+      },
+      citedSources: [{ ...source, citationPosition: 0 }],
+      metadata: {
+        promptVersions: { classification: "classify.v1", resolution: "resolve.v1" },
+        provider: "anthropic",
+        model: "test-model",
+        latencyMs: 1,
+        inputTokens: 1,
+        outputTokens: 1,
+        retryCount: 0,
+        validationPassed: true,
+      },
+    };
+
+    expect(ResolutionExecutionSchema.safeParse(execution).success).toBe(true);
+    expect(ResolutionExecutionSchema.safeParse({
+      ...execution,
+      citedSources: [{ ...execution.citedSources[0], chunkId: traceId }],
+    }).success).toBe(false);
   });
 });

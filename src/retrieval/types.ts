@@ -5,6 +5,7 @@ import { ChunkMetadataSchema } from "@/domain/knowledge";
 export const RetrievedEvidenceSchema = z.object({
   chunkId: z.string().uuid(),
   sourceId: z.string().trim().min(1),
+  title: z.string().trim().min(1),
   section: z.string().trim().min(1),
   content: z.string().trim().min(1),
   tokenCount: z.number().int().positive(),

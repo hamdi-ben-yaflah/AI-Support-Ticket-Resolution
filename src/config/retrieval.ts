@@ -6,7 +6,7 @@ const RetrievalConfigSchema = z
   .object({
     RETRIEVAL_CANDIDATE_COUNT: z.coerce.number().int().min(1).max(50).default(8),
     RETRIEVAL_FINAL_COUNT: z.coerce.number().int().min(1).max(8).default(5),
-    RETRIEVAL_MINIMUM_SIMILARITY: z.coerce.number().min(-1).max(1).default(0.68),
+    RETRIEVAL_MINIMUM_SIMILARITY: z.coerce.number().min(-1).max(1).default(0.65),
     RETRIEVAL_MAXIMUM_CONTEXT_TOKENS: z.coerce
       .number()
       .int()

@@ -43,6 +43,15 @@ function provider(
   parse: ReturnType<typeof vi.fn>,
   maxRetries = 2,
   model = "claude-sonnet-5",
+  clock: {
+    now: () => number;
+    sleep: (milliseconds: number) => Promise<void>;
+    random: () => number;
+  } = {
+    now: () => 0,
+    sleep: vi.fn().mockResolvedValue(undefined),
+    random: () => 0,
+  },
 ) {
   const client = { messages: { parse } } as unknown as Anthropic;
   return new AnthropicLlmProvider({
@@ -51,7 +60,7 @@ function provider(
     timeoutMs: 10_000,
     maxRetries,
     client,
-    clock: { now: () => 0, sleep: vi.fn().mockResolvedValue(undefined), random: () => 0 },
+    clock,
   });
 }
 
@@ -70,6 +79,10 @@ describe("AnthropicLlmProvider", () => {
       metadata: { user_id: request.metadata.traceId },
     });
     expect(parse.mock.calls[0]?.[0]).not.toHaveProperty("temperature");
+    expect(parse.mock.calls[0]?.[1]).toMatchObject({
+      maxRetries: 0,
+      timeout: 10_000,
+    });
   });
 
   it("keeps an explicit temperature for Anthropic models that support it", async () => {
@@ -109,6 +122,62 @@ describe("AnthropicLlmProvider", () => {
     const result = await provider(parse).generateStructured(request);
     expect(result.retryCount).toBe(1);
     expect(parse).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses only the remaining operation deadline for a transient retry", async () => {
+    let now = 0;
+    const sleep = vi.fn(async (milliseconds: number) => {
+      now += milliseconds;
+    });
+    const parse = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        now = 2_000;
+        return Promise.reject(new APIConnectionError({ message: "offline" }));
+      })
+      .mockResolvedValueOnce(message());
+
+    await provider(parse, 2, "claude-sonnet-5", {
+      now: () => now,
+      sleep,
+      random: () => 0,
+    }).generateStructured(request);
+
+    expect(sleep).toHaveBeenCalledWith(187.5);
+    expect(parse.mock.calls.map((call) => call[1]?.timeout)).toEqual([10_000, 7_812]);
+  });
+
+  it("does not retry when backoff would exhaust the operation deadline", async () => {
+    let now = 0;
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const parse = vi.fn().mockImplementationOnce(() => {
+      now = 9_900;
+      return Promise.reject(new APIConnectionError({ message: "offline" }));
+    });
+
+    await expect(
+      provider(parse, 2, "claude-sonnet-5", {
+        now: () => now,
+        sleep,
+        random: () => 0,
+      }).generateStructured(request),
+    ).rejects.toMatchObject({ code: "unavailable", retryCount: 0 });
+    expect(parse).toHaveBeenCalledOnce();
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it("does not start a request after the operation deadline is exhausted", async () => {
+    const now = vi.fn().mockReturnValueOnce(0).mockReturnValue(10_000);
+    const parse = vi.fn();
+
+    await expect(
+      provider(parse, 2, "claude-sonnet-5", {
+        now,
+        sleep: vi.fn().mockResolvedValue(undefined),
+        random: () => 0,
+      }).generateStructured(request),
+    ).rejects.toMatchObject({ code: "timeout", retryCount: 0 });
+    expect(parse).not.toHaveBeenCalled();
   });
 
   it("limits timeout retries to one", async () => {

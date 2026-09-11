@@ -1,7 +1,10 @@
 import "server-only";
 
 import { LlmError, isLlmError } from "@/ai/errors";
-import { classifyTicket } from "@/ai/pipeline/classify-ticket";
+import {
+  classifyTicketWithMetadata,
+  type ClassificationExecution,
+} from "@/ai/pipeline/classify-ticket";
 import { validateGroundedReply } from "@/ai/pipeline/validate-grounding";
 import {
   buildResolutionInput,
@@ -16,8 +19,11 @@ import {
   GroundedReplySchema,
   ResolutionProposalSchema,
   type GroundedReply,
-  type ResolutionProposal,
 } from "@/domain/grounded-reply";
+import {
+  ResolutionExecutionSchema,
+  type ResolutionExecution,
+} from "@/domain/resolution-run";
 import type { TicketInput } from "@/domain/ticket";
 import { createLogger, logger, type AppLogger } from "@/observability/logger";
 import { createConfiguredEvidenceRetriever } from "@/retrieval/search";
@@ -29,7 +35,7 @@ export type ResolutionContext = { traceId: string };
 type Classifier = (
   input: TicketInput,
   context: ResolutionContext,
-) => Promise<Classification>;
+) => Promise<ClassificationExecution>;
 
 type ResolveTicketOptions = ResolutionContext & {
   classifier: Classifier;
@@ -61,11 +67,11 @@ export function createResolutionRequest(input: {
 export async function resolveTicket(
   input: TicketInput,
   options: ResolveTicketOptions,
-): Promise<ResolutionProposal> {
+): Promise<ResolutionExecution> {
   const log = options.log ?? logger;
-  const classification = ClassificationSchema.parse(
-    await options.classifier(input, { traceId: options.traceId }),
-  );
+  const pipelineStartedAt = Date.now();
+  const classified = await options.classifier(input, { traceId: options.traceId });
+  const classification = ClassificationSchema.parse(classified.classification);
   const evidence = await options.retriever.retrieve({
     text: input.text,
     category: classification.category,
@@ -87,6 +93,44 @@ export async function resolveTicket(
       ...classification,
       groundedReply,
     });
+    const evidenceById = new Map(evidence.map((item) => [item.chunkId, item]));
+    const citedSources = groundedReply.citations.map((citation, citationPosition) => {
+      const source = evidenceById.get(citation.chunkId);
+      if (!source) {
+        throw new LlmError("invalid_output", "Citation provenance is unavailable.", {
+          retryable: false,
+        });
+      }
+
+      return {
+        citationPosition,
+        chunkId: source.chunkId,
+        sourceId: source.sourceId,
+        title: source.title,
+        section: source.section,
+        content: source.content,
+      };
+    });
+
+    const execution = ResolutionExecutionSchema.parse({
+      proposal,
+      citedSources,
+      metadata: {
+        promptVersions: {
+          classification: classified.metadata.promptVersion,
+          resolution: RESOLUTION_PROMPT_VERSION,
+        },
+        provider: options.provider.name,
+        model: generated.model,
+        latencyMs: Math.max(0, Date.now() - pipelineStartedAt),
+        inputTokens:
+          classified.metadata.inputTokens + generated.usage.inputTokens,
+        outputTokens:
+          classified.metadata.outputTokens + generated.usage.outputTokens,
+        retryCount: classified.metadata.retryCount + generated.retryCount,
+        validationPassed: true,
+      },
+    });
     log.info({
       event: "model_call",
       traceId: options.traceId,
@@ -104,7 +148,7 @@ export async function resolveTicket(
       retryCount: generated.retryCount,
       evidenceCount: evidence.length,
     });
-    return proposal;
+    return execution;
   } catch (error) {
     const mapped = isLlmError(error)
       ? error
@@ -134,7 +178,7 @@ export async function resolveTicket(
 export async function resolveTicketWithConfiguredProviders(
   input: TicketInput,
   context: ResolutionContext,
-): Promise<ResolutionProposal> {
+): Promise<ResolutionExecution> {
   let config;
   try {
     config = getAiConfig();
@@ -166,7 +210,7 @@ export async function resolveTicketWithConfiguredProviders(
     provider,
     retriever,
     classifier: (ticket, classificationContext) =>
-      classifyTicket(ticket, {
+      classifyTicketWithMetadata(ticket, {
         ...classificationContext,
         provider,
         log,

@@ -293,7 +293,7 @@ Default configuration:
 const retrievalConfig = {
   candidateCount: 8,
   finalCount: 5,
-  minimumSimilarity: 0.68,
+  minimumSimilarity: 0.65,
   maximumContextTokens: 3_500
 };
 ```
@@ -586,7 +586,7 @@ EMBEDDING_MODEL=
 AI_REQUEST_TIMEOUT_MS=15000
 AI_MAX_RETRIES=2
 RETRIEVAL_TOP_K=5
-RETRIEVAL_MIN_SIMILARITY=0.68
+RETRIEVAL_MIN_SIMILARITY=0.65
 LOG_RAW_AI_CONTENT=false
 ```
 

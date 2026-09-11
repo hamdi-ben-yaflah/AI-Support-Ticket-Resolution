@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { RetrievalConfig } from "@/config/retrieval";
+import { getRetrievalConfig, type RetrievalConfig } from "@/config/retrieval";
 import type { EmbeddingProvider } from "@/embeddings/types";
 import { retrieveEvidence, selectEvidence } from "@/retrieval/search";
 import type { RetrievalCandidate } from "@/retrieval/types";
@@ -8,11 +8,23 @@ import type { RetrievalCandidate } from "@/retrieval/types";
 const ids = ["123e4567-e89b-42d3-a456-426614174000", "223e4567-e89b-42d3-a456-426614174000", "323e4567-e89b-42d3-a456-426614174000"];
 const config: RetrievalConfig = { candidateCount: 8, finalCount: 2, minimumSimilarity: 0.7, maximumContextTokens: 10, minimumEvidenceCount: 1, version: "retrieval.v1" };
 function candidate(index: number, similarity: number, tokenCount = 3): RetrievalCandidate {
-  return { chunkId: ids[index] as string, section: `Section ${index}`, content: `Content ${index}`, tokenCount, similarity, metadata: { sourceId: `source-${index}`, category: "billing", version: "1" } };
+  return { chunkId: ids[index] as string, title: `Title ${index}`, section: `Section ${index}`, content: `Content ${index}`, tokenCount, similarity, metadata: { sourceId: `source-${index}`, category: "billing", version: "1" } };
 }
 const embedder: EmbeddingProvider = { name: "fake", model: "fake", dimensions: 2, embed: vi.fn().mockResolvedValue({ vectors: [[1, 0]], model: "fake", usage: { inputTokens: 2 }, latencyMs: 1, retryCount: 0 }) };
 
 describe("retrieval", () => {
+  it("retains the reproduced duplicate-charge match at the default threshold", () => {
+    const defaultConfig = getRetrievalConfig({ NODE_ENV: "test" });
+
+    expect(defaultConfig.minimumSimilarity).toBe(0.65);
+    expect(
+      selectEvidence(
+        [candidate(0, 0.6605782700274324), candidate(1, 0.6499999999999999)],
+        defaultConfig,
+      ).map((item) => item.chunkId),
+    ).toEqual([ids[0]]);
+  });
+
   it("deduplicates, thresholds, orders, and applies count/token budgets", () => {
     expect(selectEvidence([candidate(0, 0.75), candidate(1, 0.9, 8), candidate(0, 0.8), candidate(2, 0.6)], config).map((item) => item.chunkId)).toEqual([ids[1]]);
   });

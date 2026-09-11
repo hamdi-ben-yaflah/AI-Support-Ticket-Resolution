@@ -25,6 +25,18 @@ type ClassifyTicketOptions = ClassificationContext & {
   log?: AppLogger;
 };
 
+export type ClassificationExecution = {
+  classification: Classification;
+  metadata: {
+    provider: string;
+    model: string;
+    promptVersion: string;
+    inputTokens: number;
+    outputTokens: number;
+    retryCount: number;
+  };
+};
+
 export function createClassificationRequest(
   input: TicketInput,
   traceId: string,
@@ -47,6 +59,14 @@ export async function classifyTicket(
   input: TicketInput,
   options: ClassifyTicketOptions,
 ): Promise<Classification> {
+  const execution = await classifyTicketWithMetadata(input, options);
+  return execution.classification;
+}
+
+export async function classifyTicketWithMetadata(
+  input: TicketInput,
+  options: ClassifyTicketOptions,
+): Promise<ClassificationExecution> {
   const log = options.log ?? logger;
   const startedAt = Date.now();
 
@@ -80,7 +100,17 @@ export async function classifyTicket(
       retryCount: result.retryCount,
     });
 
-    return classification.data;
+    return {
+      classification: classification.data,
+      metadata: {
+        provider: options.provider.name,
+        model: result.model,
+        promptVersion: CLASSIFICATION_PROMPT_VERSION,
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+        retryCount: result.retryCount,
+      },
+    };
   } catch (error) {
     const llmError = isLlmError(error)
       ? error

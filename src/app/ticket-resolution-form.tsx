@@ -1,15 +1,23 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { createApiResultSchema, type ApiErrorCode } from "@/domain/api-result";
 import {
+  type Citation,
   ResolutionProposalSchema,
   type ResolutionProposal,
 } from "@/domain/grounded-reply";
+import { SourceDetailSchema, type SourceDetail } from "@/domain/source";
 import { TicketInputSchema, type TicketInput } from "@/domain/ticket";
 
 const ResolutionResultSchema = createApiResultSchema(ResolutionProposalSchema);
+const SourceResultSchema = createApiResultSchema(SourceDetailSchema);
+
+type SourceState =
+  | { name: "loading" }
+  | { name: "ready"; source: SourceDetail }
+  | { name: "failure"; retryable: boolean };
 
 type ViewState =
   | { name: "idle" }
@@ -27,6 +35,8 @@ const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   model_refused: "The model could not draft a proposal. Send it for human review.",
   model_truncated: "The model returned an incomplete proposal. Send it for human review.",
   model_output_invalid: "The model result did not pass validation. Send it for human review.",
+  source_not_found: "The cited source is not available for this session.",
+  source_unavailable: "The cited source is temporarily unavailable.",
   configuration_error: "The resolution service is not configured. Contact an engineer.",
   internal_error: "Something unexpected prevented resolution. Contact an engineer.",
 };
@@ -43,17 +53,124 @@ export function TicketResolutionForm() {
   const textareaId = useId();
   const tierId = useId();
   const inFlight = useRef(false);
+  const sourceRequestVersion = useRef(0);
+  const sourceAbortController = useRef<AbortController | undefined>(undefined);
   const [text, setText] = useState("");
   const [customerTier, setCustomerTier] = useState<"" | "standard" | "premium">("");
   const [touched, setTouched] = useState(false);
   const [state, setState] = useState<ViewState>({ name: "idle" });
+  const [sourceStates, setSourceStates] = useState<Record<string, SourceState>>({});
+
+  useEffect(
+    () => () => {
+      sourceAbortController.current?.abort();
+    },
+    [],
+  );
 
   const inputError = validationMessage(text);
   const isProcessing = state.name === "processing";
   const canSubmit = !inputError && !isProcessing;
 
   function returnToIdle() {
-    if (!inFlight.current) setState({ name: "idle" });
+    if (!inFlight.current) {
+      sourceRequestVersion.current += 1;
+      sourceAbortController.current?.abort();
+      sourceAbortController.current = undefined;
+      setSourceStates({});
+      setState({ name: "idle" });
+    }
+  }
+
+  async function loadCitationSource(
+    citation: Citation,
+    version: number,
+    signal: AbortSignal,
+  ) {
+    setSourceStates((current) => ({
+      ...current,
+      [citation.chunkId]: { name: "loading" },
+    }));
+
+    try {
+      const response = await fetch(`/api/sources/${encodeURIComponent(citation.chunkId)}`, {
+        credentials: "same-origin",
+        signal,
+      });
+      const raw: unknown = await response.json();
+      const result = SourceResultSchema.safeParse(raw);
+      if (version !== sourceRequestVersion.current || signal.aborted) return;
+
+      if (!result.success) {
+        setSourceStates((current) => ({
+          ...current,
+          [citation.chunkId]: {
+            name: "failure",
+            retryable: false,
+          },
+        }));
+        return;
+      }
+
+      if (!result.data.ok) {
+        const retryable = result.data.error.retryable;
+        setSourceStates((current) => ({
+          ...current,
+          [citation.chunkId]: { name: "failure", retryable },
+        }));
+        return;
+      }
+
+      const source = result.data.data;
+      if (source.chunkId !== citation.chunkId) {
+        setSourceStates((current) => ({
+          ...current,
+          [citation.chunkId]: { name: "failure", retryable: false },
+        }));
+        return;
+      }
+
+      setSourceStates((current) => ({
+        ...current,
+        [citation.chunkId]: { name: "ready", source },
+      }));
+    } catch {
+      if (version === sourceRequestVersion.current && !signal.aborted) {
+        setSourceStates((current) => ({
+          ...current,
+          [citation.chunkId]: { name: "failure", retryable: true },
+        }));
+      }
+    }
+  }
+
+  function loadProposalSources(proposal: ResolutionProposal) {
+    sourceRequestVersion.current += 1;
+    const version = sourceRequestVersion.current;
+    sourceAbortController.current?.abort();
+    const controller = new AbortController();
+    sourceAbortController.current = controller;
+    setSourceStates(
+      Object.fromEntries(
+        proposal.groundedReply.citations.map((citation) => [
+          citation.chunkId,
+          { name: "loading" } satisfies SourceState,
+        ]),
+      ),
+    );
+    for (const citation of proposal.groundedReply.citations) {
+      void loadCitationSource(citation, version, controller.signal);
+    }
+  }
+
+  function retrySource(citation: Citation) {
+    const controller = sourceAbortController.current ?? new AbortController();
+    sourceAbortController.current = controller;
+    void loadCitationSource(
+      citation,
+      sourceRequestVersion.current,
+      controller.signal,
+    );
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -69,6 +186,10 @@ export function TicketResolutionForm() {
     if (!validInput.success) return;
 
     inFlight.current = true;
+    sourceRequestVersion.current += 1;
+    sourceAbortController.current?.abort();
+    sourceAbortController.current = undefined;
+    setSourceStates({});
     setState({ name: "processing" });
 
     try {
@@ -95,6 +216,7 @@ export function TicketResolutionForm() {
           traceId: result.data.traceId,
           proposal: result.data.data,
         });
+        loadProposalSources(result.data.data);
       }
     } catch {
       setState({ name: "failure", retryable: true });
@@ -267,17 +389,59 @@ export function TicketResolutionForm() {
                     Knowledge citations
                   </p>
                   <ul className="mt-3 space-y-2">
-                    {state.proposal.groundedReply.citations.map((citation) => (
-                      <li
-                        key={citation.chunkId}
-                        className="rounded-xl border border-[#e0e4df] bg-white px-3 py-3 text-xs leading-5 text-[#52605b]"
-                      >
-                        <span className="font-semibold text-[#2f5549]">{citation.sourceId}</span>
-                        <span aria-hidden="true"> · </span>
-                        <span>{citation.section}</span>
-                        <p className="mt-1 text-[#6d7773]">{citation.claim}</p>
-                      </li>
-                    ))}
+                    {state.proposal.groundedReply.citations.map((citation) => {
+                      const sourceState = sourceStates[citation.chunkId];
+                      return (
+                        <li
+                          key={citation.chunkId}
+                          className="rounded-xl border border-[#d9e1dc] bg-white px-4 py-4 text-xs leading-5 text-[#52605b]"
+                        >
+                          {sourceState?.name === "ready" ? (
+                            <>
+                              <p className="font-semibold text-[#284f43]">
+                                {sourceState.source.title}
+                              </p>
+                              <p className="mt-0.5 text-[#708079]">
+                                {sourceState.source.sourceId}
+                                <span aria-hidden="true"> · </span>
+                                {sourceState.source.section}
+                              </p>
+                              <div className="mt-3 rounded-lg border border-[#dbe5df] bg-[#f3f7f4] px-3 py-3">
+                                <p className="font-semibold uppercase tracking-[0.1em] text-[#56736a]">
+                                  Retrieved evidence
+                                </p>
+                                <p className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-[#30463f]">
+                                  {sourceState.source.content}
+                                </p>
+                              </div>
+                            </>
+                          ) : sourceState?.name === "failure" ? (
+                            <div role="alert" className="rounded-lg bg-[#fff4f2] px-3 py-3 text-[#854d48]">
+                              <p>The exact source could not be loaded.</p>
+                              {sourceState.retryable && (
+                                <button
+                                  type="button"
+                                  onClick={() => retrySource(citation)}
+                                  className="mt-2 rounded-md border border-[#d5aaa5] bg-white px-3 py-1.5 font-semibold text-[#8f312b] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8f312b]"
+                                >
+                                  Retry source
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <p role="status" className="text-[#66746f]">
+                              Loading exact source…
+                            </p>
+                          )}
+                          <div className="mt-3 border-t border-[#e5e8e5] pt-3">
+                            <p className="font-semibold uppercase tracking-[0.1em] text-[#7a8580]">
+                              Generated support claim
+                            </p>
+                            <p className="mt-1 text-[#626f6a]">{citation.claim}</p>
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               </div>

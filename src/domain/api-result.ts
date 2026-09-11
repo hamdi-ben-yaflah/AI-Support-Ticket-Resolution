@@ -9,6 +9,8 @@ export const ApiErrorCodeSchema = z.enum([
   "model_refused",
   "model_truncated",
   "model_output_invalid",
+  "source_not_found",
+  "source_unavailable",
   "configuration_error",
   "internal_error",
 ]);

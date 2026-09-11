@@ -7,8 +7,19 @@ import {
   resolveTicketWithConfiguredProviders,
   type ResolutionContext,
 } from "@/ai/pipeline/resolve-ticket";
+import {
+  getOrCreateResolutionSession,
+  type ResolutionSession,
+} from "@/auth/session";
+import { SessionConfigurationError } from "@/config/session";
+import { persistSuccessfulResolution } from "@/db/resolution-runs";
 import { createApiResultSchema, type ApiErrorCode, type ApiResult } from "@/domain/api-result";
 import { ResolutionProposalSchema, type ResolutionProposal } from "@/domain/grounded-reply";
+import type {
+  PersistedResolutionRun,
+  ResolutionExecution,
+} from "@/domain/resolution-run";
+import { ResolutionExecutionSchema } from "@/domain/resolution-run";
 import { TicketInputSchema, type TicketInput } from "@/domain/ticket";
 import { logger, type AppLogger } from "@/observability/logger";
 import { isRetrievalError } from "@/retrieval/errors";
@@ -16,10 +27,12 @@ import { isRetrievalError } from "@/retrieval/errors";
 type Resolver = (
   input: TicketInput,
   context: ResolutionContext,
-) => Promise<ResolutionProposal>;
+) => Promise<ResolutionExecution>;
 
 type HandlerDependencies = {
   resolve?: Resolver;
+  createSession?: (request: Request, ticketText: string) => ResolutionSession;
+  persist?: (run: PersistedResolutionRun) => Promise<void>;
   createTraceId?: () => string;
   log?: AppLogger;
 };
@@ -30,6 +43,13 @@ type ErrorResponse = {
   message: string;
   retryable: boolean;
 };
+
+class ResolutionPersistenceError extends Error {
+  constructor(cause: unknown) {
+    super("Resolution authorization context could not be saved.", { cause });
+    this.name = "ResolutionPersistenceError";
+  }
+}
 
 const ResolutionApiResultSchema = createApiResultSchema(ResolutionProposalSchema);
 
@@ -48,6 +68,24 @@ function failure(traceId: string, error: ErrorResponse) {
 }
 
 function mapResolutionError(error: unknown): ErrorResponse {
+  if (error instanceof SessionConfigurationError) {
+    return {
+      status: 500,
+      code: "configuration_error",
+      message: "The resolution service is not configured.",
+      retryable: false,
+    };
+  }
+
+  if (error instanceof ResolutionPersistenceError) {
+    return {
+      status: 503,
+      code: "internal_error",
+      message: "The ticket could not be resolved.",
+      retryable: true,
+    };
+  }
+
   if (isRetrievalError(error)) {
     return error.code === "insufficient_evidence"
       ? {
@@ -128,6 +166,8 @@ function mapResolutionError(error: unknown): ErrorResponse {
 
 export function createResolveHandler(dependencies: HandlerDependencies = {}) {
   const resolve = dependencies.resolve ?? resolveTicketWithConfiguredProviders;
+  const createSession = dependencies.createSession ?? getOrCreateResolutionSession;
+  const persist = dependencies.persist ?? persistSuccessfulResolution;
   const createTraceId = dependencies.createTraceId ?? randomUUID;
   const log = dependencies.log ?? logger;
 
@@ -159,24 +199,55 @@ export function createResolveHandler(dependencies: HandlerDependencies = {}) {
     }
 
     try {
-      const proposal = await resolve(input.data, { traceId });
+      const session = createSession(request, input.data.text);
+      const execution = ResolutionExecutionSchema.parse(
+        await resolve(input.data, { traceId }),
+      );
+      try {
+        await persist({
+          traceId,
+          sessionHash: session.sessionHash,
+          ticketHash: session.ticketHash,
+          classification: {
+            category: execution.proposal.category,
+            priority: execution.proposal.priority,
+            summary: execution.proposal.summary,
+            confidence: execution.proposal.confidence,
+          },
+          action: { type: "reply" },
+          citedSources: execution.citedSources,
+          metadata: execution.metadata,
+        });
+      } catch (error) {
+        throw new ResolutionPersistenceError(error);
+      }
       const result: ApiResult<ResolutionProposal> = {
         ok: true,
         traceId,
-        data: proposal,
+        data: execution.proposal,
       };
 
       log.info({ event: "resolve_request_completed", traceId });
-      return NextResponse.json(ResolutionApiResultSchema.parse(result), { status: 200 });
+      const response = NextResponse.json(ResolutionApiResultSchema.parse(result), {
+        status: 200,
+      });
+      if (session.cookie) {
+        response.cookies.set(
+          session.cookie.name,
+          session.cookie.value,
+          session.cookie.options,
+        );
+      }
+      return response;
     } catch (error) {
-      const mapped = mapResolutionError(error);
+      const responseError = mapResolutionError(error);
       log.error({
         event: "resolve_request_failed",
         traceId,
-        code: mapped.code,
-        retryable: mapped.retryable,
+        code: responseError.code,
+        retryable: responseError.retryable,
       });
-      return failure(traceId, mapped);
+      return failure(traceId, responseError);
     }
   };
 }

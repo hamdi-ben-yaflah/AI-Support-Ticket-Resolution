@@ -164,8 +164,7 @@ export class AnthropicLlmProvider implements LlmProvider {
         });
       }
 
-      const attemptsRemaining = this.maxRetries - retryCount + 1;
-      const attemptTimeoutMs = Math.max(1, Math.floor(remainingMs / attemptsRemaining));
+      const attemptTimeoutMs = Math.max(1, Math.floor(remainingMs));
 
       try {
         const message = await this.client.messages.parse(

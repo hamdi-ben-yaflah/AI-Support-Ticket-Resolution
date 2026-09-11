@@ -10,6 +10,7 @@ import { ChunkMetadataSchema, DocumentMetadataSchema } from "@/domain/knowledge"
 const SearchRowSchema = z.object({
   chunkId: z.string().uuid(),
   documentId: z.string().uuid(),
+  title: z.string().trim().min(1),
   section: z.string().trim().min(1),
   content: z.string().trim().min(1),
   tokenCount: z.number().int().positive(),
@@ -105,6 +106,7 @@ export async function searchDocumentChunks(input: {
     .select({
       chunkId: documentChunks.id,
       documentId: documentChunks.documentId,
+      title: documents.title,
       section: documentChunks.section,
       content: documentChunks.content,
       tokenCount: documentChunks.tokenCount,
@@ -112,6 +114,7 @@ export async function searchDocumentChunks(input: {
       similarity,
     })
     .from(documentChunks)
+    .innerJoin(documents, eq(documentChunks.documentId, documents.id))
     .where(categoryCondition)
     .orderBy(distance, documentChunks.id)
     .limit(input.limit);

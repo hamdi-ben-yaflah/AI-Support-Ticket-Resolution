@@ -60,6 +60,7 @@ export function selectEvidence(
     selected.push({
       chunkId: candidate.chunkId,
       sourceId: candidate.metadata.sourceId,
+      title: candidate.title,
       section: candidate.section,
       content: candidate.content,
       tokenCount: candidate.tokenCount,
