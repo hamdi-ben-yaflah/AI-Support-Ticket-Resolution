@@ -98,9 +98,10 @@ describe("grounded reply schemas", () => {
     }],
   };
 
-  it("accepts a bounded cited reply and composed proposal", () => {
+  it("accepts a bounded cited reply and both proposal branches", () => {
     expect(GroundedReplySchema.safeParse(groundedReply).success).toBe(true);
-    expect(ResolutionProposalSchema.safeParse({ category: "billing", priority: "medium", summary: "Duplicate charge", confidence: 0.9, groundedReply }).success).toBe(true);
+    expect(ResolutionProposalSchema.safeParse({ category: "billing", priority: "medium", summary: "Duplicate charge", confidence: 0.9, action: "reply", reason: "The policy supports a review.", groundedReply }).success).toBe(true);
+    expect(ResolutionProposalSchema.safeParse({ category: "other", priority: "low", summary: "Unsupported question", confidence: 0.9, action: "needs_human_review", reason: "No relevant policy was retrieved." }).success).toBe(true);
   });
 
   it("requires citations with UUIDs and enforces response and citation limits", () => {
@@ -110,9 +111,18 @@ describe("grounded reply schemas", () => {
     expect(GroundedReplySchema.safeParse({ suggestedResponse: "x", citations: [{ ...groundedReply.citations[0], chunkId: "not-a-uuid" }] }).success).toBe(false);
   });
 
-  it.each(["retrieval_unavailable", "insufficient_evidence"])("allows the %s API error code", (code) => {
+  it("rejects hybrid, unbounded, and unsupported proposal actions", () => {
+    const base = { category: "billing", priority: "medium", summary: "Duplicate charge", confidence: 0.9 };
+    expect(ResolutionProposalSchema.safeParse({ ...base, action: "needs_human_review", reason: "Review it.", groundedReply }).success).toBe(false);
+    expect(ResolutionProposalSchema.safeParse({ ...base, action: "reply", reason: "Review it." }).success).toBe(false);
+    expect(ResolutionProposalSchema.safeParse({ ...base, action: "escalate", reason: "Review it." }).success).toBe(false);
+    expect(ResolutionProposalSchema.safeParse({ ...base, action: "needs_human_review", reason: "x".repeat(301) }).success).toBe(false);
+  });
+
+  it("keeps retrieval unavailability as an API error and rejects insufficient evidence", () => {
     const schema = createApiResultSchema(ResolutionProposalSchema);
-    expect(schema.safeParse({ ok: false, traceId, error: { code, message: "Safe message", retryable: false } }).success).toBe(true);
+    expect(schema.safeParse({ ok: false, traceId, error: { code: "retrieval_unavailable", message: "Safe message", retryable: true } }).success).toBe(true);
+    expect(schema.safeParse({ ok: false, traceId, error: { code: "insufficient_evidence", message: "Safe message", retryable: false } }).success).toBe(false);
   });
 });
 
@@ -137,10 +147,11 @@ describe("source and resolution-run schemas", () => {
       sessionHash: "a".repeat(64),
       ticketHash: "b".repeat(64),
       classification: { category: "billing", priority: "medium", summary: "Duplicate", confidence: 0.9 },
-      action: { type: "reply" },
+      action: { type: "reply", reason: "The policy supports a response." },
       citedSources: [{ ...source, citationPosition: 0 }],
       metadata: {
-        promptVersions: { classification: "classify.v1", resolution: "resolve.v1" },
+        promptVersions: { classification: "classify.v1", resolution: "resolve.v3" },
+        resolutionPolicy: { version: "resolution-policy.v1", minimumConfidence: 0.65 },
         provider: "anthropic",
         model: "test-model",
         latencyMs: 10,
@@ -168,11 +179,14 @@ describe("source and resolution-run schemas", () => {
         priority: "medium",
         summary: "Duplicate",
         confidence: 0.9,
+        action: "reply",
+        reason: "The policy supports a response.",
         groundedReply: { suggestedResponse: "A draft.", citations: [citation] },
       },
       citedSources: [{ ...source, citationPosition: 0 }],
       metadata: {
-        promptVersions: { classification: "classify.v1", resolution: "resolve.v1" },
+        promptVersions: { classification: "classify.v1", resolution: "resolve.v3" },
+        resolutionPolicy: { version: "resolution-policy.v1", minimumConfidence: 0.65 },
         provider: "anthropic",
         model: "test-model",
         latencyMs: 1,
@@ -188,5 +202,40 @@ describe("source and resolution-run schemas", () => {
       ...execution,
       citedSources: [{ ...execution.citedSources[0], chunkId: traceId }],
     }).success).toBe(false);
+  });
+
+  it("requires zero sources for human review and at least one for reply runs", () => {
+    const metadata = {
+      promptVersions: { classification: "classify.v1", resolution: "resolve.v3" },
+      resolutionPolicy: { version: "resolution-policy.v1", minimumConfidence: 0.65 },
+      provider: "anthropic",
+      model: "test-model",
+      latencyMs: 1,
+      inputTokens: 1,
+      outputTokens: 1,
+      retryCount: 0,
+      validationPassed: true,
+    };
+    const proposal = {
+      category: "other",
+      priority: "low",
+      summary: "Unsupported",
+      confidence: 0.9,
+      action: "needs_human_review",
+      reason: "No relevant evidence was found.",
+    };
+    expect(ResolutionExecutionSchema.safeParse({ proposal, citedSources: [], metadata }).success).toBe(true);
+    expect(ResolutionExecutionSchema.safeParse({ proposal, citedSources: [{ ...source, citationPosition: 0 }], metadata }).success).toBe(false);
+
+    const persistedBase = {
+      traceId,
+      sessionHash: "a".repeat(64),
+      ticketHash: "b".repeat(64),
+      classification: { category: "other", priority: "low", summary: "Unsupported", confidence: 0.9 },
+      metadata,
+    };
+    expect(PersistedResolutionRunSchema.safeParse({ ...persistedBase, action: { type: "needs_human_review", reason: proposal.reason }, citedSources: [] }).success).toBe(true);
+    expect(PersistedResolutionRunSchema.safeParse({ ...persistedBase, action: { type: "reply", reason: "Supported." }, citedSources: [] }).success).toBe(false);
+    expect(PersistedResolutionRunSchema.safeParse({ ...persistedBase, action: { type: "needs_human_review", reason: proposal.reason }, citedSources: [{ ...source, citationPosition: 0 }] }).success).toBe(false);
   });
 });

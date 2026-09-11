@@ -46,17 +46,19 @@ export async function persistSuccessfulResolution(
 
     if (!run) throw new Error("Resolution run insert returned no identifier.");
 
-    await transaction.insert(resolutionRunSources).values(
-      input.citedSources.map((source) => ({
-        resolutionRunId: run.id,
-        citationPosition: source.citationPosition,
-        chunkId: source.chunkId,
-        sourceId: source.sourceId,
-        title: source.title,
-        section: source.section,
-        content: source.content,
-      })),
-    );
+    if (input.citedSources.length > 0) {
+      await transaction.insert(resolutionRunSources).values(
+        input.citedSources.map((source) => ({
+          resolutionRunId: run.id,
+          citationPosition: source.citationPosition,
+          chunkId: source.chunkId,
+          sourceId: source.sourceId,
+          title: source.title,
+          section: source.section,
+          content: source.content,
+        })),
+      );
+    }
   });
 }
 

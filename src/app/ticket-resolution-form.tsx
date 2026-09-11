@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createApiResultSchema, type ApiErrorCode } from "@/domain/api-result";
 import {
   type Citation,
+  type ReplyResolutionProposal,
   ResolutionProposalSchema,
   type ResolutionProposal,
 } from "@/domain/grounded-reply";
@@ -30,8 +31,6 @@ const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   provider_timeout: "The model took too long to respond. You can try this ticket again.",
   provider_unavailable: "The model service is temporarily unavailable. You can try again.",
   retrieval_unavailable: "Knowledge retrieval is temporarily unavailable. You can try again.",
-  insufficient_evidence:
-    "The knowledge base does not contain enough evidence for a safe proposed reply. Send it for human review.",
   model_refused: "The model could not draft a proposal. Send it for human review.",
   model_truncated: "The model returned an incomplete proposal. Send it for human review.",
   model_output_invalid: "The model result did not pass validation. Send it for human review.",
@@ -144,7 +143,7 @@ export function TicketResolutionForm() {
     }
   }
 
-  function loadProposalSources(proposal: ResolutionProposal) {
+  function loadProposalSources(proposal: ReplyResolutionProposal) {
     sourceRequestVersion.current += 1;
     const version = sourceRequestVersion.current;
     sourceAbortController.current?.abort();
@@ -216,7 +215,13 @@ export function TicketResolutionForm() {
           traceId: result.data.traceId,
           proposal: result.data.data,
         });
-        loadProposalSources(result.data.data);
+        if (result.data.data.action === "reply") {
+          loadProposalSources(result.data.data);
+        } else {
+          sourceRequestVersion.current += 1;
+          sourceAbortController.current = undefined;
+          setSourceStates({});
+        }
       }
     } catch {
       setState({ name: "failure", retryable: true });
@@ -233,7 +238,8 @@ export function TicketResolutionForm() {
           Resolve a support ticket
         </h2>
         <p className="mt-2 text-sm leading-6 text-[#65706c]">
-          Synthetic data only. Anthropic classifies and drafts; Voyage AI is used only for knowledge retrieval embeddings.
+          Synthetic data only. Anthropic classifies and recommends; Voyage AI is used
+          only for knowledge retrieval embeddings.
         </p>
       </div>
 
@@ -352,14 +358,70 @@ export function TicketResolutionForm() {
           </div>
         )}
 
-        {state.name === "success" && (
+        {state.name === "success" &&
+          state.proposal.action === "needs_human_review" && (
+          <section
+            role="alert"
+            className="overflow-hidden rounded-2xl border border-[#deb86e] bg-[#fffaf0] shadow-[0_14px_32px_rgba(87,64,28,0.08)]"
+          >
+            <div className="flex flex-col gap-3 border-b border-[#ead7ae] bg-[#fff2d2] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.13em] text-[#8a651f]">
+                  Insufficient evidence warning
+                </p>
+                <h3 className="mt-1 text-base font-semibold text-[#5f4212]">
+                  Human review required
+                </h3>
+              </div>
+              <span className="w-fit rounded-full border border-[#dfc27f] bg-white px-3 py-1 text-xs font-semibold text-[#76561d]">
+                {Math.round(state.proposal.confidence * 100)}% confidence signal
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-px bg-[#ead7ae]">
+              <ResultField label="Category" value={state.proposal.category} />
+              <ResultField label="Priority" value={state.proposal.priority} />
+            </div>
+            <div className="px-5 py-5 sm:px-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#887047]">
+                Summary
+              </p>
+              <p className="mt-2 text-[15px] leading-6 text-[#3e3423]">
+                {state.proposal.summary}
+              </p>
+              <div className="mt-5 rounded-xl border border-[#e1c98f] bg-white px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#806021]">
+                  Why review is needed
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[#5c4a2b]">
+                  {state.proposal.reason}
+                </p>
+              </div>
+              <div className="mt-5 rounded-xl bg-[#5f4212] px-4 py-4 text-[#fff8e8]">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#f0d89e]">
+                  Recommended next action
+                </p>
+                <p className="mt-2 text-sm leading-6">
+                  Review the ticket and supporting policy manually. No proposed reply or
+                  customer action was produced.
+                </p>
+              </div>
+              <p className="mt-5 border-t border-[#eadfc8] pt-4 font-mono text-[11px] text-[#8b7958]">
+                Trace {state.traceId}
+              </p>
+            </div>
+          </section>
+        )}
+
+        {state.name === "success" && state.proposal.action === "reply" && (
           <section className="overflow-hidden rounded-2xl border border-[#bfcfc9] bg-white shadow-[0_14px_32px_rgba(43,63,56,0.07)]">
             <div className="flex flex-col gap-3 border-b border-[#e1e5e1] bg-[#f0f6f3] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.13em] text-[#56736a]">
                   AI-generated proposal
                 </p>
-                <h3 className="mt-1 text-base font-semibold text-[#213b33]">Human review required</h3>
+                <h3 className="mt-1 text-base font-semibold text-[#213b33]">
+                  Supported draft ready
+                </h3>
               </div>
               <span className="w-fit rounded-full border border-[#c5d8d1] bg-white px-3 py-1 text-xs font-semibold text-[#356152]">
                 {Math.round(state.proposal.confidence * 100)}% confidence signal
@@ -372,6 +434,14 @@ export function TicketResolutionForm() {
             <div className="px-5 py-5 sm:px-6">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a8580]">Summary</p>
               <p className="mt-2 text-[15px] leading-6 text-[#26312d]">{state.proposal.summary}</p>
+              <div className="mt-4 rounded-xl border border-[#e1e5e1] bg-[#f7f9f7] px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6f7d77]">
+                  Why a draft is supported
+                </p>
+                <p className="mt-1.5 text-sm leading-6 text-[#5f6f69]">
+                  {state.proposal.reason}
+                </p>
+              </div>
               <div className="mt-6 rounded-2xl border border-[#d8ded9] bg-[#fafbf9] p-4 sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#526d64]">

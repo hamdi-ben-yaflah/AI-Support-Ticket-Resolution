@@ -1,9 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 
 const sourceId = "integration-resolution-source";
 const traceIds = [
   "11111111-1111-4111-8111-111111111111",
   "22222222-2222-4222-8222-222222222222",
+  "33333333-3333-4333-8333-333333333333",
 ];
 const ownerHash = "a".repeat(64);
 const otherHash = "b".repeat(64);
@@ -36,7 +38,7 @@ function runInput(traceId: string, chunkId: string) {
       summary: "Synthetic duplicate charge",
       confidence: 0.9,
     },
-    action: { type: "reply" as const },
+    action: { type: "reply" as const, reason: "The evidence supports a reply." },
     citedSources: [{
       citationPosition: 0,
       chunkId,
@@ -46,7 +48,8 @@ function runInput(traceId: string, chunkId: string) {
       content: "Original exact cited content.",
     }],
     metadata: {
-      promptVersions: { classification: "classify.v1", resolution: "resolve.v1" },
+      promptVersions: { classification: "classify.v1", resolution: "resolve.v3" },
+      resolutionPolicy: { version: "resolution-policy.v1" as const, minimumConfidence: 0.65 },
       provider: "fake",
       model: "fake-model",
       latencyMs: 10,
@@ -155,5 +158,45 @@ describe("PostgreSQL resolution source repository", () => {
     duplicate.citedSources.push({ ...duplicate.citedSources[0]!, citationPosition: 1 });
     await expect(persistSuccessfulResolution(duplicate)).rejects.toBeDefined();
     await expect(findOwnedSource(ownerHash, duplicateChunkId)).resolves.toBeUndefined();
+  });
+
+  it("persists an abstention without granting source access", async () => {
+    const { searchDocumentChunks } = await import("@/db/knowledge");
+    const { getDatabase } = await import("@/db/client");
+    const { resolutionRuns } = await import("@/db/schema");
+    const { findOwnedSource, persistSuccessfulResolution } = await import(
+      "@/db/resolution-runs"
+    );
+    const rows = await searchDocumentChunks({
+      embedding: vector(),
+      category: "billing",
+      limit: 20,
+    });
+    const chunk = rows.find((row) => row.metadata.sourceId === sourceId);
+    expect(chunk).toBeDefined();
+    if (!chunk) throw new Error("Synthetic integration chunk was not found.");
+
+    const abstention = {
+      ...runInput(traceIds[2] as string, chunk.chunkId),
+      sessionHash: otherHash,
+      action: {
+        type: "needs_human_review" as const,
+        reason: "The available evidence is insufficient for a safe reply.",
+      },
+      citedSources: [],
+    };
+    await expect(persistSuccessfulResolution(abstention)).resolves.toBeUndefined();
+    const [stored] = await getDatabase()
+      .select({
+        action: resolutionRuns.action,
+        resultStatus: resolutionRuns.resultStatus,
+      })
+      .from(resolutionRuns)
+      .where(eq(resolutionRuns.traceId, abstention.traceId));
+    expect(stored).toEqual({
+      action: abstention.action,
+      resultStatus: "success",
+    });
+    await expect(findOwnedSource(otherHash, chunk.chunkId)).resolves.toBeUndefined();
   });
 });

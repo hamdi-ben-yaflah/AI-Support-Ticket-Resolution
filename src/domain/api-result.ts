@@ -5,7 +5,6 @@ export const ApiErrorCodeSchema = z.enum([
   "provider_timeout",
   "provider_unavailable",
   "retrieval_unavailable",
-  "insufficient_evidence",
   "model_refused",
   "model_truncated",
   "model_output_invalid",

@@ -12,6 +12,7 @@ const traceId = "123e4567-e89b-42d3-a456-426614174000";
 const chunkId = "223e4567-e89b-42d3-a456-426614174000";
 const proposal: ResolutionProposal = {
   category: "billing", priority: "medium", summary: "Customer reports a duplicate plan charge.", confidence: 0.9,
+  action: "reply", reason: "The retrieved duplicate-charge policy supports a draft.",
   groundedReply: { suggestedResponse: "I’m sorry about the duplicate charge. We can submit it for review.", citations: [{ chunkId, sourceId: "duplicate-charges", section: "Duplicate charges > When both charges settled", claim: "Duplicate settled charges can be submitted for review." }] },
 };
 const execution: ResolutionExecution = {
@@ -25,7 +26,8 @@ const execution: ResolutionExecution = {
     content: "Settled duplicate charges can be submitted for review.",
   }],
   metadata: {
-    promptVersions: { classification: "classify.v1", resolution: "resolve.v1" },
+    promptVersions: { classification: "classify.v1", resolution: "resolve.v3" },
+    resolutionPolicy: { version: "resolution-policy.v1", minimumConfidence: 0.65 },
     provider: "fake",
     model: "fake-model",
     latencyMs: 10,
@@ -61,13 +63,14 @@ describe("POST /api/tickets/resolve", () => {
     const response = await createResolveHandler({ resolve, persist, createSession: () => session, createTraceId: () => traceId, log: logger() })(request(JSON.stringify({ text: "I was charged for both plans.", customerTier: "premium" })));
     const body = await response.json();
     expect(response.status).toBe(200);
-    expect(body).toMatchObject({ ok: true, traceId, data: { category: "billing", groundedReply: { citations: [{ chunkId }] } } });
+    expect(body).toMatchObject({ ok: true, traceId, data: { category: "billing", action: "reply", groundedReply: { citations: [{ chunkId }] } } });
     expect(resolve).toHaveBeenCalledWith({ text: "I was charged for both plans.", customerTier: "premium" }, { traceId });
     expect(persist).toHaveBeenCalledWith(expect.objectContaining({
       traceId,
       sessionHash: session.sessionHash,
       ticketHash: session.ticketHash,
       citedSources: execution.citedSources,
+      action: { type: "reply", reason: proposal.reason },
     }));
     expect(response.headers.get("set-cookie")).toContain("support_copilot_session=signed-cookie");
     expect(response.headers.get("set-cookie")).toContain("HttpOnly");
@@ -105,6 +108,45 @@ describe("POST /api/tickets/resolve", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("returns and persists a successful abstention without source grants", async () => {
+    const abstention: ResolutionExecution = {
+      proposal: {
+        category: "other",
+        priority: "low",
+        summary: "Question is outside the available support policy.",
+        confidence: 0.92,
+        action: "needs_human_review",
+        reason: "The knowledge base does not contain enough evidence for a safe reply.",
+      },
+      citedSources: [],
+      metadata: execution.metadata,
+    };
+    const persist = vi.fn().mockResolvedValue(undefined);
+    const response = await createResolveHandler({
+      resolve: vi.fn().mockResolvedValue(abstention),
+      persist,
+      createSession: () => session,
+      createTraceId: () => traceId,
+      log: logger(),
+    })(request(JSON.stringify({ text: "What is the weather next weekend?" })));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      traceId,
+      data: { action: "needs_human_review", reason: expect.stringContaining("evidence") },
+    });
+    expect(persist).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: {
+          type: "needs_human_review",
+          reason: abstention.proposal.reason,
+        },
+        citedSources: [],
+      }),
+    );
   });
 
   it("maps invalid session configuration without calling the resolver", async () => {
@@ -148,12 +190,32 @@ describe("POST /api/tickets/resolve", () => {
     expect(JSON.stringify(body)).not.toContain("sensitive SDK detail");
   });
 
-  it.each([["unavailable", 503, "retrieval_unavailable", true], ["insufficient_evidence", 422, "insufficient_evidence", false]] as const)("maps retrieval %s safely", async (code, status, apiCode, retryable) => {
+  it.each([["unavailable", 503, "retrieval_unavailable", true]] as const)("maps retrieval %s safely", async (code, status, apiCode, retryable) => {
     const resolve = vi.fn().mockRejectedValue(new RetrievalError(code, "sensitive database detail", { retryable }));
     const response = await createResolveHandler({ resolve, createSession: () => session, createTraceId: () => traceId, log: logger() })(request(JSON.stringify({ text: "A valid ticket body" })));
     const body = await response.json();
     expect(response.status).toBe(status);
     expect(body).toMatchObject({ ok: false, traceId, error: { code: apiCode, retryable } });
     expect(JSON.stringify(body)).not.toContain("sensitive database detail");
+  });
+
+  it("does not expose a leaked internal insufficient-evidence error as a normal abstention", async () => {
+    const resolve = vi.fn().mockRejectedValue(
+      new RetrievalError("insufficient_evidence", "sensitive retrieval detail", {
+        retryable: false,
+      }),
+    );
+    const response = await createResolveHandler({
+      resolve,
+      createSession: () => session,
+      createTraceId: () => traceId,
+      log: logger(),
+    })(request(JSON.stringify({ text: "A valid ticket body" })));
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: { code: "internal_error", retryable: false },
+    });
   });
 });

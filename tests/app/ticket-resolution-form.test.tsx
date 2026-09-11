@@ -51,9 +51,10 @@ describe("TicketResolutionForm", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Resolving the ticket");
     fireEvent.submit(screen.getByRole("button", { name: /resolving/i }).closest("form")!);
     expect(fetchMock).toHaveBeenCalledOnce();
-    resolveJson({ ok: true, traceId, data: { category: "billing", priority: "medium", summary: "Customer reports charges for both plans.", confidence: 0.89, groundedReply: { suggestedResponse: "I’m sorry about the duplicate charge. We can submit this for review.", citations: [{ chunkId, sourceId: "duplicate-charges", section: "Duplicate charges > When both charges settled", claim: "Duplicate settled charges can be reviewed." }] } } });
+    resolveJson({ ok: true, traceId, data: { category: "billing", priority: "medium", summary: "Customer reports charges for both plans.", confidence: 0.89, action: "reply", reason: "The retrieved policy supports a duplicate-charge review.", groundedReply: { suggestedResponse: "I’m sorry about the duplicate charge. We can submit this for review.", citations: [{ chunkId, sourceId: "duplicate-charges", section: "Duplicate charges > When both charges settled", claim: "Duplicate settled charges can be reviewed." }] } } });
     expect(await screen.findByText(/submit this for review/)).toBeInTheDocument();
     expect(screen.getByText("Draft · not sent")).toBeInTheDocument();
+    expect(screen.getByText("Supported draft ready")).toBeInTheDocument();
     expect(await screen.findByText("Duplicate plan charges")).toBeInTheDocument();
     expect(screen.getByText("Settled duplicate charges can be submitted for review.")).toBeInTheDocument();
     expect(screen.getByText("Retrieved evidence")).toBeInTheDocument();
@@ -66,7 +67,7 @@ describe("TicketResolutionForm", () => {
   it("keeps the proposal visible and retries a temporary source failure", async () => {
     const user = userEvent.setup();
     const chunkId = "223e4567-e89b-42d3-a456-426614174000";
-    const proposal = { category: "billing", priority: "medium", summary: "Duplicate charge", confidence: 0.9, groundedReply: { suggestedResponse: "We can review it.", citations: [{ chunkId, sourceId: "duplicate-charges", section: "Review", claim: "A review is available." }] } };
+    const proposal = { category: "billing", priority: "medium", summary: "Duplicate charge", confidence: 0.9, action: "reply", reason: "The retrieved policy supports a review.", groundedReply: { suggestedResponse: "We can review it.", citations: [{ chunkId, sourceId: "duplicate-charges", section: "Review", claim: "A review is available." }] } };
     vi.stubGlobal("fetch", vi.fn()
       .mockResolvedValueOnce({ json: async () => ({ ok: true, traceId, data: proposal }) })
       .mockResolvedValueOnce({ json: async () => ({ ok: false, traceId, error: { code: "source_unavailable", message: "safe", retryable: true } }) })
@@ -96,6 +97,8 @@ describe("TicketResolutionForm", () => {
       priority: "medium",
       summary: `${label} summary`,
       confidence: 0.9,
+      action: "reply",
+      reason: `${label} evidence supports a reply`,
       groundedReply: {
         suggestedResponse: `${label} draft`,
         citations: [{
@@ -129,7 +132,73 @@ describe("TicketResolutionForm", () => {
     });
   });
 
-  it.each([["retrieval_unavailable", "temporarily unavailable", "Try resolution again"], ["insufficient_evidence", "enough evidence", undefined], ["model_output_invalid", "did not pass validation", undefined]] as const)("renders controlled %s details", async (code, message, retryLabel) => {
+  it("renders an evidence warning without loading sources or showing a draft", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      json: async () => ({
+        ok: true,
+        traceId,
+        data: {
+          category: "other",
+          priority: "low",
+          summary: "The request is outside the available support guidance.",
+          confidence: 0.91,
+          action: "needs_human_review",
+          reason: "The knowledge base does not contain enough evidence for a safe reply.",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<TicketResolutionForm />);
+    await user.type(
+      screen.getByRole("textbox", { name: /ticket text/i }),
+      "What is the weather next weekend?",
+    );
+    await user.click(screen.getByRole("button", { name: "Resolve ticket" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Insufficient evidence warning");
+    expect(alert).toHaveTextContent("Human review required");
+    expect(alert).toHaveTextContent("91% confidence signal");
+    expect(alert).toHaveTextContent("does not contain enough evidence");
+    expect(alert).toHaveTextContent("No proposed reply or customer action was produced");
+    expect(alert).toHaveTextContent(`Trace ${traceId}`);
+    expect(screen.queryByText("Draft · not sent")).not.toBeInTheDocument();
+    expect(screen.queryByText("Knowledge citations")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("clears a pending source when an abstention replaces a cited reply", async () => {
+    const user = userEvent.setup();
+    const chunkId = "223e4567-e89b-42d3-a456-426614174000";
+    let resolveSource!: (value: unknown) => void;
+    const sourceJson = new Promise((resolve) => {
+      resolveSource = resolve;
+    });
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({ json: async () => ({ ok: true, traceId, data: { category: "billing", priority: "medium", summary: "Duplicate charge", confidence: 0.9, action: "reply", reason: "Supported.", groundedReply: { suggestedResponse: "We can review it.", citations: [{ chunkId, sourceId: "duplicate-charges", section: "Review", claim: "Review is supported." }] } } }) })
+      .mockResolvedValueOnce({ json: () => sourceJson })
+      .mockResolvedValueOnce({ json: async () => ({ ok: true, traceId, data: { category: "other", priority: "low", summary: "Unsupported question", confidence: 0.9, action: "needs_human_review", reason: "No relevant evidence was found." } }) }));
+
+    render(<TicketResolutionForm />);
+    const textarea = screen.getByRole("textbox", { name: /ticket text/i });
+    await user.type(textarea, "I was charged for both plans.");
+    await user.click(screen.getByRole("button", { name: "Resolve ticket" }));
+    expect(await screen.findByText("We can review it.")).toBeInTheDocument();
+
+    await user.clear(textarea);
+    await user.type(textarea, "What is the weather next weekend?");
+    await user.click(screen.getByRole("button", { name: "Resolve ticket" }));
+    expect(await screen.findByText("No relevant evidence was found.")).toBeInTheDocument();
+
+    resolveSource({ ok: true, traceId, data: { chunkId, sourceId: "duplicate-charges", title: "Stale source", section: "Review", content: "Stale exact evidence." } });
+    await vi.waitFor(() => {
+      expect(screen.queryByText("Stale exact evidence.")).not.toBeInTheDocument();
+    });
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([["retrieval_unavailable", "temporarily unavailable", "Try resolution again"], ["model_output_invalid", "did not pass validation", undefined]] as const)("renders controlled %s details", async (code, message, retryLabel) => {
     const user = userEvent.setup();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ json: async () => ({ ok: false, traceId, error: { code, message: "unsafe upstream detail", retryable: Boolean(retryLabel) } }) }));
     render(<TicketResolutionForm />);

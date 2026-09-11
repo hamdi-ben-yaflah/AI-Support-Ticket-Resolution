@@ -12,14 +12,32 @@ export const PromptVersionsSchema = z
   .strict();
 
 export const ResolutionActionSchema = z
+  .discriminatedUnion("type", [
+    z
+      .object({
+        type: z.literal("reply"),
+        reason: z.string().trim().min(1).max(300),
+      })
+      .strict(),
+    z
+      .object({
+        type: z.literal("needs_human_review"),
+        reason: z.string().trim().min(1).max(300),
+      })
+      .strict(),
+  ]);
+
+export const ResolutionPolicyMetadataSchema = z
   .object({
-    type: z.literal("reply"),
+    version: z.literal("resolution-policy.v1"),
+    minimumConfidence: z.number().min(0).max(1),
   })
   .strict();
 
 export const ResolutionRunMetadataSchema = z
   .object({
     promptVersions: PromptVersionsSchema,
+    resolutionPolicy: ResolutionPolicyMetadataSchema,
     provider: z.string().trim().min(1).max(120),
     model: z.string().trim().min(1).max(200),
     latencyMs: z.number().int().nonnegative(),
@@ -37,11 +55,22 @@ export const CitedSourceSnapshotSchema = SourceDetailSchema.extend({
 export const ResolutionExecutionSchema = z
   .object({
     proposal: ResolutionProposalSchema,
-    citedSources: z.array(CitedSourceSnapshotSchema).min(1).max(8),
+    citedSources: z.array(CitedSourceSnapshotSchema).max(8),
     metadata: ResolutionRunMetadataSchema,
   })
   .strict()
   .superRefine((execution, context) => {
+    if (execution.proposal.action === "needs_human_review") {
+      if (execution.citedSources.length !== 0) {
+        context.addIssue({
+          code: "custom",
+          path: ["citedSources"],
+          message: "Human-review outcomes cannot grant cited sources.",
+        });
+      }
+      return;
+    }
+
     const citations = execution.proposal.groundedReply.citations;
     if (execution.citedSources.length !== citations.length) {
       context.addIssue({
@@ -77,10 +106,26 @@ export const PersistedResolutionRunSchema = z
     ticketHash: z.string().regex(/^[a-f0-9]{64}$/),
     classification: ClassificationSchema,
     action: ResolutionActionSchema,
-    citedSources: z.array(CitedSourceSnapshotSchema).min(1).max(8),
+    citedSources: z.array(CitedSourceSnapshotSchema).max(8),
     metadata: ResolutionRunMetadataSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((run, context) => {
+    if (run.action.type === "reply" && run.citedSources.length === 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["citedSources"],
+        message: "Reply runs require cited source snapshots.",
+      });
+    }
+    if (run.action.type === "needs_human_review" && run.citedSources.length !== 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["citedSources"],
+        message: "Human-review runs cannot grant cited sources.",
+      });
+    }
+  });
 
 export type ResolutionExecution = z.infer<typeof ResolutionExecutionSchema>;
 export type ResolutionRunMetadata = z.infer<typeof ResolutionRunMetadataSchema>;

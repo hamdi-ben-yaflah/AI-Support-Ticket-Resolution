@@ -2,6 +2,7 @@ import Anthropic, { APIConnectionError, APIConnectionTimeoutError } from "@anthr
 import { describe, expect, it, vi } from "vitest";
 
 import { LlmError } from "@/ai/errors";
+import { createResolutionRequest } from "@/ai/pipeline/resolve-ticket";
 import { AnthropicLlmProvider } from "@/ai/providers/anthropic";
 import type { GenerateRequest } from "@/ai/types";
 import { ClassificationSchema, type Classification } from "@/domain/classification";
@@ -92,6 +93,53 @@ describe("AnthropicLlmProvider", () => {
     expect(parse.mock.calls[0]?.[0]).toMatchObject({
       model: "claude-sonnet-4-6",
       temperature: 0,
+    });
+  });
+
+  it("serializes and validates the provider-compatible resolution schema", async () => {
+    const parse = vi.fn().mockResolvedValue(
+      message({
+        parsed_output: {
+          action: "needs_human_review",
+          reason: "The retrieved policies conflict.",
+          groundedReply: null,
+        },
+      }),
+    );
+    const resolutionRequest = createResolutionRequest({
+      ticket: { text: "A synthetic support question" },
+      classification: {
+        category: "other",
+        priority: "low",
+        summary: "Synthetic question",
+        confidence: 0.9,
+      },
+      evidence: [
+        {
+          chunkId: "223e4567-e89b-42d3-a456-426614174000",
+          sourceId: "policy-a",
+          title: "Policy A",
+          section: "Policy A > Rule",
+          content: "A synthetic rule.",
+          tokenCount: 4,
+          similarity: 0.9,
+        },
+      ],
+      traceId: request.metadata.traceId,
+    });
+
+    await expect(
+      provider(parse).generateStructured(resolutionRequest),
+    ).resolves.toMatchObject({
+      value: {
+        action: "needs_human_review",
+        reason: "The retrieved policies conflict.",
+        groundedReply: null,
+      },
+    });
+    expect(parse.mock.calls[0]?.[0]?.output_config?.format).toMatchObject({
+      type: "json_schema",
+      schema: { type: "object" },
     });
   });
 

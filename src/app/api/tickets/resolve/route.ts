@@ -86,20 +86,13 @@ function mapResolutionError(error: unknown): ErrorResponse {
     };
   }
 
-  if (isRetrievalError(error)) {
-    return error.code === "insufficient_evidence"
-      ? {
-          status: 422,
-          code: "insufficient_evidence",
-          message: "The knowledge base does not contain enough evidence for a safe reply.",
-          retryable: false,
-        }
-      : {
-          status: 503,
-          code: "retrieval_unavailable",
-          message: "Knowledge retrieval is temporarily unavailable. Try again.",
-          retryable: true,
-        };
+  if (isRetrievalError(error) && error.code === "unavailable") {
+    return {
+      status: 503,
+      code: "retrieval_unavailable",
+      message: "Knowledge retrieval is temporarily unavailable. Try again.",
+      retryable: true,
+    };
   }
 
   if (!isLlmError(error)) {
@@ -214,7 +207,10 @@ export function createResolveHandler(dependencies: HandlerDependencies = {}) {
             summary: execution.proposal.summary,
             confidence: execution.proposal.confidence,
           },
-          action: { type: "reply" },
+          action: {
+            type: execution.proposal.action,
+            reason: execution.proposal.reason,
+          },
           citedSources: execution.citedSources,
           metadata: execution.metadata,
         });
