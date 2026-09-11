@@ -4,21 +4,22 @@ import { NextResponse } from "next/server";
 
 import { isLlmError } from "@/ai/errors";
 import {
-  classifyTicketWithConfiguredProvider,
-  type ClassificationContext,
-} from "@/ai/pipeline/classify-ticket";
-import type { ApiErrorCode, ApiResult } from "@/domain/api-result";
-import type { Classification } from "@/domain/classification";
+  resolveTicketWithConfiguredProviders,
+  type ResolutionContext,
+} from "@/ai/pipeline/resolve-ticket";
+import { createApiResultSchema, type ApiErrorCode, type ApiResult } from "@/domain/api-result";
+import { ResolutionProposalSchema, type ResolutionProposal } from "@/domain/grounded-reply";
 import { TicketInputSchema, type TicketInput } from "@/domain/ticket";
 import { logger, type AppLogger } from "@/observability/logger";
+import { isRetrievalError } from "@/retrieval/errors";
 
-type Classifier = (
+type Resolver = (
   input: TicketInput,
-  context: ClassificationContext,
-) => Promise<Classification>;
+  context: ResolutionContext,
+) => Promise<ResolutionProposal>;
 
 type HandlerDependencies = {
-  classify?: Classifier;
+  resolve?: Resolver;
   createTraceId?: () => string;
   log?: AppLogger;
 };
@@ -30,8 +31,10 @@ type ErrorResponse = {
   retryable: boolean;
 };
 
+const ResolutionApiResultSchema = createApiResultSchema(ResolutionProposalSchema);
+
 function failure(traceId: string, error: ErrorResponse) {
-  const body: ApiResult<Classification> = {
+  const body: ApiResult<ResolutionProposal> = {
     ok: false,
     traceId,
     error: {
@@ -41,15 +44,31 @@ function failure(traceId: string, error: ErrorResponse) {
     },
   };
 
-  return NextResponse.json(body, { status: error.status });
+  return NextResponse.json(ResolutionApiResultSchema.parse(body), { status: error.status });
 }
 
-function mapClassificationError(error: unknown): ErrorResponse {
+function mapResolutionError(error: unknown): ErrorResponse {
+  if (isRetrievalError(error)) {
+    return error.code === "insufficient_evidence"
+      ? {
+          status: 422,
+          code: "insufficient_evidence",
+          message: "The knowledge base does not contain enough evidence for a safe reply.",
+          retryable: false,
+        }
+      : {
+          status: 503,
+          code: "retrieval_unavailable",
+          message: "Knowledge retrieval is temporarily unavailable. Try again.",
+          retryable: true,
+        };
+  }
+
   if (!isLlmError(error)) {
     return {
       status: 500,
       code: "internal_error",
-      message: "The ticket could not be classified.",
+      message: "The ticket could not be resolved.",
       retryable: false,
     };
   }
@@ -59,56 +78,56 @@ function mapClassificationError(error: unknown): ErrorResponse {
       return {
         status: 504,
         code: "provider_timeout",
-        message: "The classification request timed out. Try again.",
+        message: "The model request timed out. Try again.",
         retryable: true,
       };
     case "unavailable":
       return {
         status: 503,
         code: "provider_unavailable",
-        message: "The classification service is temporarily unavailable. Try again.",
+        message: "The model service is temporarily unavailable. Try again.",
         retryable: true,
       };
     case "refused":
       return {
         status: 502,
         code: "model_refused",
-        message: "The model could not classify this ticket. Human review is required.",
+        message: "The model could not produce a proposal. Human review is required.",
         retryable: false,
       };
     case "truncated":
       return {
         status: 502,
         code: "model_truncated",
-        message: "The model returned an incomplete classification.",
+        message: "The model returned an incomplete proposal.",
         retryable: false,
       };
     case "invalid_output":
       return {
         status: 502,
         code: "model_output_invalid",
-        message: "The model returned a classification that could not be validated.",
+        message: "The model returned a proposal that could not be validated.",
         retryable: false,
       };
     case "configuration":
       return {
         status: 500,
         code: "configuration_error",
-        message: "The classification service is not configured.",
+        message: "The resolution service is not configured.",
         retryable: false,
       };
     case "unexpected":
       return {
         status: 500,
         code: "internal_error",
-        message: "The ticket could not be classified.",
+        message: "The ticket could not be resolved.",
         retryable: false,
       };
   }
 }
 
 export function createResolveHandler(dependencies: HandlerDependencies = {}) {
-  const classify = dependencies.classify ?? classifyTicketWithConfiguredProvider;
+  const resolve = dependencies.resolve ?? resolveTicketWithConfiguredProviders;
   const createTraceId = dependencies.createTraceId ?? randomUUID;
   const log = dependencies.log ?? logger;
 
@@ -140,17 +159,17 @@ export function createResolveHandler(dependencies: HandlerDependencies = {}) {
     }
 
     try {
-      const classification = await classify(input.data, { traceId });
-      const result: ApiResult<Classification> = {
+      const proposal = await resolve(input.data, { traceId });
+      const result: ApiResult<ResolutionProposal> = {
         ok: true,
         traceId,
-        data: classification,
+        data: proposal,
       };
 
       log.info({ event: "resolve_request_completed", traceId });
-      return NextResponse.json(result, { status: 200 });
+      return NextResponse.json(ResolutionApiResultSchema.parse(result), { status: 200 });
     } catch (error) {
-      const mapped = mapClassificationError(error);
+      const mapped = mapResolutionError(error);
       log.error({
         event: "resolve_request_failed",
         traceId,

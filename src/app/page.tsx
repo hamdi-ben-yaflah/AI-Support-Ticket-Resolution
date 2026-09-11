@@ -1,4 +1,4 @@
-import { TicketClassifierForm } from "@/app/ticket-classifier-form";
+import { TicketResolutionForm } from "@/app/ticket-resolution-form";
 
 export default function Home() {
   return (
@@ -27,13 +27,13 @@ export default function Home() {
           <section className="flex flex-col justify-between border-b border-[#deddd5] bg-[#173f36] p-7 text-white sm:p-10 lg:min-h-[720px] lg:border-r lg:border-b-0 lg:p-12">
             <div>
               <p className="mb-8 inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#e9d983]">
-                Classification workspace
+                Grounded resolution workspace
               </p>
               <h1 className="max-w-xl text-4xl leading-[1.06] font-semibold tracking-[-0.045em] sm:text-5xl lg:text-[3.45rem]">
-                Turn a new ticket into a clear first read.
+                Turn a new ticket into an evidence-backed first reply.
               </h1>
               <p className="mt-6 max-w-lg text-base leading-7 text-[#c6d5d0]">
-                Get a structured category, priority, and concise summary before deciding what happens next.
+                Get a structured classification and a proposed response grounded in the synthetic knowledge base.
               </p>
             </div>
 
@@ -52,7 +52,7 @@ export default function Home() {
           </section>
 
           <section className="p-5 sm:p-8 lg:p-10 xl:p-14">
-            <TicketClassifierForm />
+            <TicketResolutionForm />
           </section>
         </div>
       </div>

@@ -3,26 +3,32 @@
 import { useId, useRef, useState } from "react";
 
 import { createApiResultSchema, type ApiErrorCode } from "@/domain/api-result";
-import { ClassificationSchema, type Classification } from "@/domain/classification";
+import {
+  ResolutionProposalSchema,
+  type ResolutionProposal,
+} from "@/domain/grounded-reply";
 import { TicketInputSchema, type TicketInput } from "@/domain/ticket";
 
-const ClassificationResultSchema = createApiResultSchema(ClassificationSchema);
+const ResolutionResultSchema = createApiResultSchema(ResolutionProposalSchema);
 
 type ViewState =
   | { name: "idle" }
   | { name: "processing" }
-  | { name: "success"; traceId: string; classification: Classification }
+  | { name: "success"; traceId: string; proposal: ResolutionProposal }
   | { name: "failure"; traceId?: string; code?: ApiErrorCode; retryable: boolean };
 
 const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   invalid_request: "The ticket input was rejected. Check its length and customer tier.",
   provider_timeout: "The model took too long to respond. You can try this ticket again.",
-  provider_unavailable: "The classification service is temporarily unavailable. You can try again.",
-  model_refused: "The model could not classify this ticket. Send it for human review.",
-  model_truncated: "The model returned an incomplete result. Send it for human review.",
+  provider_unavailable: "The model service is temporarily unavailable. You can try again.",
+  retrieval_unavailable: "Knowledge retrieval is temporarily unavailable. You can try again.",
+  insufficient_evidence:
+    "The knowledge base does not contain enough evidence for a safe proposed reply. Send it for human review.",
+  model_refused: "The model could not draft a proposal. Send it for human review.",
+  model_truncated: "The model returned an incomplete proposal. Send it for human review.",
   model_output_invalid: "The model result did not pass validation. Send it for human review.",
-  configuration_error: "The classification service is not configured. Contact an engineer.",
-  internal_error: "Something unexpected prevented classification. Contact an engineer.",
+  configuration_error: "The resolution service is not configured. Contact an engineer.",
+  internal_error: "Something unexpected prevented resolution. Contact an engineer.",
 };
 
 function validationMessage(text: string): string | undefined {
@@ -33,7 +39,7 @@ function validationMessage(text: string): string | undefined {
   return undefined;
 }
 
-export function TicketClassifierForm() {
+export function TicketResolutionForm() {
   const textareaId = useId();
   const tierId = useId();
   const inFlight = useRef(false);
@@ -72,7 +78,7 @@ export function TicketClassifierForm() {
         body: JSON.stringify(validInput.data),
       });
       const raw: unknown = await response.json();
-      const result = ClassificationResultSchema.safeParse(raw);
+      const result = ResolutionResultSchema.safeParse(raw);
 
       if (!result.success) {
         setState({ name: "failure", retryable: false });
@@ -87,7 +93,7 @@ export function TicketClassifierForm() {
         setState({
           name: "success",
           traceId: result.data.traceId,
-          classification: result.data.data,
+          proposal: result.data.data,
         });
       }
     } catch {
@@ -102,10 +108,10 @@ export function TicketClassifierForm() {
       <div className="mb-8">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7a6552]">New analysis</p>
         <h2 className="mt-2 text-3xl font-semibold tracking-[-0.035em] text-[#17201d]">
-          Classify a support ticket
+          Resolve a support ticket
         </h2>
         <p className="mt-2 text-sm leading-6 text-[#65706c]">
-          Synthetic data only. Ticket text is sent to Anthropic for structured classification.
+          Synthetic data only. Anthropic classifies and drafts; Voyage AI is used only for knowledge retrieval embeddings.
         </p>
       </div>
 
@@ -180,12 +186,12 @@ export function TicketClassifierForm() {
                   className="size-4 animate-spin rounded-full border-2 border-[#19372f]/25 border-t-[#19372f]"
                   aria-hidden="true"
                 />
-                Classifying…
+                Resolving…
               </>
             ) : state.name === "failure" && state.retryable ? (
-              "Try classification again"
+              "Try resolution again"
             ) : (
-              "Classify ticket"
+              "Resolve ticket"
             )}
           </button>
         </div>
@@ -196,14 +202,14 @@ export function TicketClassifierForm() {
           <div className="rounded-2xl border border-dashed border-[#c8ccc6] bg-[#f7f6f1] px-5 py-6">
             <p className="text-sm font-semibold text-[#53605b]">Awaiting a ticket</p>
             <p className="mt-1 text-sm text-[#7a8580]">
-              A validated classification proposal will appear here.
+              A validated, knowledge-grounded proposal will appear here.
             </p>
           </div>
         )}
 
         {state.name === "processing" && (
           <div role="status" className="rounded-2xl border border-[#c7d8d2] bg-[#eef5f2] px-5 py-6">
-            <p className="text-sm font-semibold text-[#254f44]">Reviewing the ticket…</p>
+            <p className="text-sm font-semibold text-[#254f44]">Resolving the ticket…</p>
             <p className="mt-1 text-sm text-[#5f746d]">
               The result will be validated before it is shown.
             </p>
@@ -212,7 +218,7 @@ export function TicketClassifierForm() {
 
         {state.name === "failure" && (
           <div role="alert" className="rounded-2xl border border-[#e2b9b4] bg-[#fff4f2] px-5 py-5">
-            <p className="text-sm font-semibold text-[#8f312b]">Classification not available</p>
+            <p className="text-sm font-semibold text-[#8f312b]">Resolution not available</p>
             <p className="mt-1 text-sm leading-6 text-[#854d48]">
               {state.code
                 ? ERROR_MESSAGES[state.code]
@@ -234,16 +240,47 @@ export function TicketClassifierForm() {
                 <h3 className="mt-1 text-base font-semibold text-[#213b33]">Human review required</h3>
               </div>
               <span className="w-fit rounded-full border border-[#c5d8d1] bg-white px-3 py-1 text-xs font-semibold text-[#356152]">
-                {Math.round(state.classification.confidence * 100)}% confidence signal
+                {Math.round(state.proposal.confidence * 100)}% confidence signal
               </span>
             </div>
             <div className="grid grid-cols-2 gap-px bg-[#e1e5e1]">
-              <ResultField label="Category" value={state.classification.category} />
-              <ResultField label="Priority" value={state.classification.priority} />
+              <ResultField label="Category" value={state.proposal.category} />
+              <ResultField label="Priority" value={state.proposal.priority} />
             </div>
             <div className="px-5 py-5 sm:px-6">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a8580]">Summary</p>
-              <p className="mt-2 text-[15px] leading-6 text-[#26312d]">{state.classification.summary}</p>
+              <p className="mt-2 text-[15px] leading-6 text-[#26312d]">{state.proposal.summary}</p>
+              <div className="mt-6 rounded-2xl border border-[#d8ded9] bg-[#fafbf9] p-4 sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#526d64]">
+                    Proposed reply
+                  </p>
+                  <span className="rounded-full bg-[#f6e9b6] px-2.5 py-1 text-[11px] font-semibold text-[#725b18]">
+                    Draft · not sent
+                  </span>
+                </div>
+                <p className="mt-3 whitespace-pre-wrap text-[15px] leading-7 text-[#26312d]">
+                  {state.proposal.groundedReply.suggestedResponse}
+                </p>
+                <div className="mt-5 border-t border-[#e3e7e3] pt-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a8580]">
+                    Knowledge citations
+                  </p>
+                  <ul className="mt-3 space-y-2">
+                    {state.proposal.groundedReply.citations.map((citation) => (
+                      <li
+                        key={citation.chunkId}
+                        className="rounded-xl border border-[#e0e4df] bg-white px-3 py-3 text-xs leading-5 text-[#52605b]"
+                      >
+                        <span className="font-semibold text-[#2f5549]">{citation.sourceId}</span>
+                        <span aria-hidden="true"> · </span>
+                        <span>{citation.section}</span>
+                        <p className="mt-1 text-[#6d7773]">{citation.claim}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
               <p className="mt-5 border-t border-[#eceeea] pt-4 font-mono text-[11px] text-[#87908c]">
                 Trace {state.traceId}
               </p>

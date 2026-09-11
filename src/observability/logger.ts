@@ -17,6 +17,13 @@ const REDACTED_PATHS = [
   "system",
   "input",
   "providerResponse",
+  "embedding",
+  "embeddings",
+  "vector",
+  "vectors",
+  "content",
+  "chunks",
+  "*.content",
 ];
 
 export type AppLogger = Pick<pino.Logger, "info" | "warn" | "error">;

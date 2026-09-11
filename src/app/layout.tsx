@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Support Ticket Resolution Copilot",
-  description: "Evidence-ready, human-controlled support ticket classification.",
+  description: "Evidence-backed, human-controlled support ticket resolution.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

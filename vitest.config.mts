@@ -12,6 +12,8 @@ export default defineConfig({
   },
   test: {
     clearMocks: true,
+    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
+    exclude: ["tests/integration/**", "node_modules/**"],
     coverage: {
       reporter: ["text", "html"],
     },

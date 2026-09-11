@@ -18,11 +18,11 @@ Implement a portfolio-sized AI support workflow that converts a ticket into a va
 | Database | PostgreSQL | Durable relational state and audit records |
 | Vector search | pgvector | Keeps MVP relational and vector data together |
 | ORM | Drizzle ORM | Typed schema and explicit SQL-friendly behavior |
-| LLM provider | OpenAI or Anthropic adapter | Provider selected by environment configuration |
-| Embeddings | Provider-specific embedding adapter | Separate capability from text generation |
+| LLM provider | Anthropic adapter | Anthropic remains the only text-generation provider for this story |
+| Embeddings | Voyage AI embedding adapter | Separate capability from text generation; use document/query input types for retrieval |
 | Testing | Vitest | Unit and integration tests in TypeScript |
 | Logging | Pino-compatible structured logger | JSON telemetry with redaction |
-| Local environment | Docker Compose | Reproducible PostgreSQL and pgvector setup |
+| Local environment | Podman Compose | Reproducible PostgreSQL and pgvector setup |
 
 The provider and concrete model names are configuration, not domain constants.
 
@@ -60,7 +60,7 @@ src/
       resolve.v1.ts
     providers/
       llm-provider.ts
-      openai-provider.ts
+      voyage-provider.ts
       anthropic-provider.ts
     pipeline/
       classify-ticket.ts
@@ -595,7 +595,7 @@ Secrets belong in `.env.local` or the deployment secret manager. Commit only `.e
 ## 20. Local development commands
 
 ```bash
-docker compose up -d
+podman compose up -d
 npm install
 npm run db:migrate
 npm run ingest
@@ -624,4 +624,3 @@ Exact scripts must be documented in the README and kept consistent with `package
 - The evaluation runner reports all required quality and operational metrics.
 - The README includes architecture, setup, measured results, limitations, and at least three analyzed failure cases.
 - No secret or real customer data exists in Git history.
-

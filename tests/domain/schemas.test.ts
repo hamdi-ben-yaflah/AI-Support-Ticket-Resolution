@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createApiResultSchema } from "@/domain/api-result";
 import { ClassificationSchema } from "@/domain/classification";
+import { GroundedReplySchema, ResolutionProposalSchema } from "@/domain/grounded-reply";
 import { TicketInputSchema } from "@/domain/ticket";
 
 const traceId = "123e4567-e89b-42d3-a456-426614174000";
@@ -78,5 +79,34 @@ describe("API result schema", () => {
 
   it("rejects a non-UUID trace and unknown error code", () => {
     expect(schema.safeParse({ ok: false, traceId: "trace", error: { code: "secret", message: "x", retryable: false } }).success).toBe(false);
+  });
+});
+
+describe("grounded reply schemas", () => {
+  const groundedReply = {
+    suggestedResponse: "We can review the duplicate charge.",
+    citations: [{
+      chunkId: "223e4567-e89b-42d3-a456-426614174000",
+      sourceId: "duplicate-charges",
+      section: "Duplicate charges > Review",
+      claim: "Settled duplicates are eligible for review.",
+    }],
+  };
+
+  it("accepts a bounded cited reply and composed proposal", () => {
+    expect(GroundedReplySchema.safeParse(groundedReply).success).toBe(true);
+    expect(ResolutionProposalSchema.safeParse({ category: "billing", priority: "medium", summary: "Duplicate charge", confidence: 0.9, groundedReply }).success).toBe(true);
+  });
+
+  it("requires citations with UUIDs and enforces response and citation limits", () => {
+    expect(GroundedReplySchema.safeParse({ suggestedResponse: "x", citations: [] }).success).toBe(false);
+    expect(GroundedReplySchema.safeParse({ suggestedResponse: "x".repeat(4_001), citations: groundedReply.citations }).success).toBe(false);
+    expect(GroundedReplySchema.safeParse({ suggestedResponse: "x", citations: Array.from({ length: 9 }, () => groundedReply.citations[0]) }).success).toBe(false);
+    expect(GroundedReplySchema.safeParse({ suggestedResponse: "x", citations: [{ ...groundedReply.citations[0], chunkId: "not-a-uuid" }] }).success).toBe(false);
+  });
+
+  it.each(["retrieval_unavailable", "insufficient_evidence"])("allows the %s API error code", (code) => {
+    const schema = createApiResultSchema(ResolutionProposalSchema);
+    expect(schema.safeParse({ ok: false, traceId, error: { code, message: "Safe message", retryable: false } }).success).toBe(true);
   });
 });

@@ -199,7 +199,7 @@ export class AnthropicLlmProvider implements LlmProvider {
 
         const finishReason = parsedMessage.data.stop_reason ?? "unknown";
         if (finishReason === "refusal") {
-          throw new LlmError("refused", "The model refused the classification request.", {
+          throw new LlmError("refused", "The model refused the structured request.", {
             retryable: false,
             retryCount,
             finishReason,
@@ -216,7 +216,7 @@ export class AnthropicLlmProvider implements LlmProvider {
 
         const value = request.outputSchema.safeParse(parsedMessage.data.parsed_output);
         if (!value.success) {
-          throw new LlmError("invalid_output", "The model returned an invalid classification.", {
+          throw new LlmError("invalid_output", "The model returned invalid structured output.", {
             retryable: false,
             retryCount,
             finishReason,
