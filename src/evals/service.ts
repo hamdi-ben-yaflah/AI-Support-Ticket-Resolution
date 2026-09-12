@@ -9,6 +9,7 @@ import { getAiConfig } from "@/config/ai";
 import { getEvaluationPricing } from "@/config/evaluation";
 import { getResolutionPolicy } from "@/config/resolution";
 import { getRetrievalConfig } from "@/config/retrieval";
+import { persistEvaluationReport } from "@/db/evaluation-runs";
 import { loadGoldenDataset } from "@/evals/dataset";
 import { EvaluationSetupError } from "@/evals/errors";
 import { judgeCitations } from "@/evals/judge";
@@ -60,7 +61,7 @@ export async function runConfiguredEvaluation(concurrency = 3) {
       judge: (execution, traceId) => judgeCitations({ execution, provider, traceId }),
     };
 
-    return await runEvaluation({
+    const report = await runEvaluation({
       dataset,
       concurrency,
       dependencies,
@@ -83,6 +84,8 @@ export async function runConfiguredEvaluation(concurrency = 3) {
         pricing,
       },
     });
+    await persistEvaluationReport(report);
+    return report;
   } catch (error) {
     if (error instanceof EvaluationSetupError) throw error;
     if (error instanceof Error && error.message.toLowerCase().includes("configuration")) {

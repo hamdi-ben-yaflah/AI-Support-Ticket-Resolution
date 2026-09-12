@@ -9,6 +9,7 @@ import {
   type EvaluationReport,
 } from "@/evals/contracts";
 import { EVALUATION_THRESHOLDS } from "@/evals/thresholds";
+import { EvaluationHistory } from "@/app/admin/evaluations/evaluation-history";
 
 const EvaluationResultSchema = createApiResultSchema(EvaluationReportSchema);
 
@@ -141,6 +142,7 @@ export function EvaluationConsole() {
   const [concurrency, setConcurrency] = useState(3);
   const [filter, setFilter] = useState<"all" | "failed">("all");
   const [state, setState] = useState<ViewState>({ name: "idle" });
+  const [historyRefreshVersion, setHistoryRefreshVersion] = useState(0);
 
   const report = state.name === "complete" ? state.report : null;
   const cases = useMemo(
@@ -175,6 +177,7 @@ export function EvaluationConsole() {
       } else {
         setFilter("all");
         setState({ name: "complete", report: parsed.data.data });
+        setHistoryRefreshVersion((value) => value + 1);
       }
     } catch {
       setState({ name: "failure", message: "The evaluation request failed before completion.", retryable: true });
@@ -201,7 +204,7 @@ export function EvaluationConsole() {
         <div className="rounded-2xl border border-[#deddd5] bg-white p-5">
           <h2 className="text-xl font-semibold tracking-[-0.025em]">Run controls</h2>
           <p className="mt-2 text-sm leading-6 text-[#68736e]">
-            Runs synchronously and keeps only the latest report in this browser tab.
+            Runs synchronously. The complete report stays in this tab while its safe comparison summary is saved to PostgreSQL.
           </p>
           <label htmlFor={concurrencyId} className="mt-5 block text-sm font-semibold">Concurrency</label>
           <select
@@ -292,6 +295,8 @@ export function EvaluationConsole() {
           </div>
         </div>
       ) : null}
+
+      <EvaluationHistory refreshVersion={historyRefreshVersion} />
     </section>
   );
 }

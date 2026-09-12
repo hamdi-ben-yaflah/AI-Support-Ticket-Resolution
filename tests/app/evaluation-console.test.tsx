@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -19,7 +19,13 @@ describe("EvaluationConsole", () => {
     const user = userEvent.setup();
     let finish!: (value: unknown) => void;
     const json = new Promise((resolve) => { finish = resolve; });
-    const fetchMock = vi.fn().mockResolvedValue({ status: 200, json: () => json });
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/evaluations/runs")) {
+        return Promise.resolve({ status: 200, json: async () => ({ ok: true, traceId: evaluationTraceId, data: { runs: [] } }) });
+      }
+      return Promise.resolve({ status: 200, json: () => json });
+    });
     vi.stubGlobal("fetch", fetchMock);
     const createObjectURL = vi.fn().mockReturnValue("blob:report");
     const revokeObjectURL = vi.fn();
@@ -30,10 +36,11 @@ describe("EvaluationConsole", () => {
     await user.click(screen.getByRole("button", { name: "Run evaluation" }));
     expect(screen.getByRole("button", { name: /running evaluation/i })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: /running evaluation/i }));
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls.filter(([input]) => String(input) === "/api/evaluations/run")).toHaveLength(1);
     finish({ ok: true, traceId: evaluationTraceId, data: report });
 
     expect(await screen.findByText("Quality gate passed")).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith("/api/evaluations/runs"))).toHaveLength(2));
     expect(screen.getAllByText("Schema validity")).toHaveLength(2);
     expect(screen.getByText("P95 latency")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Failed cases" }));
@@ -48,21 +55,29 @@ describe("EvaluationConsole", () => {
 
   it("shows overlap and malformed response failures safely", async () => {
     const user = userEvent.setup();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      status: 409,
-      json: async () => ({
-        ok: false,
-        traceId: evaluationTraceId,
-        error: { code: "invalid_request", message: "unsafe", retryable: true },
-      }),
-    }));
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => Promise.resolve(
+      String(input).startsWith("/api/evaluations/runs")
+        ? { status: 200, json: async () => ({ ok: true, traceId: evaluationTraceId, data: { runs: [] } }) }
+        : {
+            status: 409,
+            json: async () => ({
+              ok: false,
+              traceId: evaluationTraceId,
+              error: { code: "invalid_request", message: "unsafe", retryable: true },
+            }),
+          },
+    )));
     const { unmount } = render(<EvaluationConsole />);
     await user.click(screen.getByRole("button", { name: "Run evaluation" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("already running");
     expect(screen.getByRole("alert")).not.toHaveTextContent("unsafe");
     unmount();
 
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 200, json: async () => ({ ok: true }) }));
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => Promise.resolve(
+      String(input).startsWith("/api/evaluations/runs")
+        ? { status: 200, json: async () => ({ ok: true, traceId: evaluationTraceId, data: { runs: [] } }) }
+        : { status: 200, json: async () => ({ ok: true }) },
+    )));
     render(<EvaluationConsole />);
     await user.click(screen.getByRole("button", { name: "Run evaluation" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("could not be verified");

@@ -15,6 +15,13 @@
       "when": 1789120381426,
       "tag": "0001_perpetual_tana_nile",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789196939302,
+      "tag": "0002_brave_terrax",
+      "breakpoints": true
     }
   ]
 }

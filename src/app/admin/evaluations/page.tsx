@@ -29,12 +29,12 @@ export default function EvaluationsPage() {
 
         <section className="border-b border-[#deddd5] bg-[#173f36] px-6 py-9 text-white sm:px-10 sm:py-12">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#e9d983]">
-            Quality gate · story 7
+            Quality gate · stories 7–8
           </p>
           <div className="mt-3 grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
               <h1 className="max-w-3xl text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">
-                Run the complete support evaluation.
+                Run and compare support evaluations.
               </h1>
               <p className="mt-4 max-w-3xl text-sm leading-6 text-[#c6d5d0] sm:text-base">
                 This unauthenticated local-only surface makes live Anthropic and Voyage AI calls
@@ -43,7 +43,7 @@ export default function EvaluationsPage() {
             </div>
             <div className="rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-sm">
               <p className="font-semibold text-[#f8e28e]">golden.v1</p>
-              <p className="mt-1 text-[#dce6e2]">36 synthetic cases · no history</p>
+              <p className="mt-1 text-[#dce6e2]">36 synthetic cases · persisted history</p>
             </div>
           </div>
         </section>

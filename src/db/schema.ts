@@ -17,6 +17,10 @@ import {
 import type { Classification } from "@/domain/classification";
 import type { ChunkMetadata, DocumentMetadata } from "@/domain/knowledge";
 import type { PromptVersions, ResolutionAction } from "@/domain/resolution-run";
+import type {
+  EvaluationCaseResult,
+  EvaluationReport,
+} from "@/evals/contracts";
 
 export const documents = pgTable(
   "documents",
@@ -125,5 +129,84 @@ export const resolutionRunSources = pgTable(
     check("resolution_run_sources_title_nonempty", sql`length(trim(${table.title})) > 0`),
     check("resolution_run_sources_section_nonempty", sql`length(trim(${table.section})) > 0`),
     check("resolution_run_sources_content_nonempty", sql`length(trim(${table.content})) > 0`),
+  ],
+);
+
+export const evaluationRuns = pgTable(
+  "evaluation_runs",
+  {
+    id: uuid("id").primaryKey(),
+    schemaVersion: text("schema_version").notNull(),
+    status: text("status").notNull(),
+    datasetVersion: text("dataset_version").notNull(),
+    datasetHash: text("dataset_hash").notNull(),
+    datasetCaseCount: integer("dataset_case_count").notNull(),
+    provider: text("provider").notNull(),
+    generationModel: text("generation_model").notNull(),
+    judgeModel: text("judge_model").notNull(),
+    promptVersions: jsonb("prompt_versions")
+      .$type<EvaluationReport["runtime"]["promptVersions"]>()
+      .notNull(),
+    retrievalConfig: jsonb("retrieval_config")
+      .$type<EvaluationReport["runtime"]["retrieval"]>()
+      .notNull(),
+    resolutionPolicy: jsonb("resolution_policy")
+      .$type<EvaluationReport["runtime"]["resolutionPolicy"]>()
+      .notNull(),
+    concurrency: integer("concurrency").notNull(),
+    pricing: jsonb("pricing").$type<EvaluationReport["runtime"]["pricing"]>(),
+    thresholdVersion: text("threshold_version").notNull(),
+    thresholds: jsonb("thresholds").$type<EvaluationReport["thresholds"]>().notNull(),
+    summary: jsonb("summary").$type<EvaluationReport["metrics"]>().notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("evaluation_runs_completed_idx").on(table.completedAt, table.id),
+    check("evaluation_runs_schema_version_nonempty", sql`length(trim(${table.schemaVersion})) > 0`),
+    check("evaluation_runs_status_valid", sql`${table.status} in ('pass', 'regression')`),
+    check("evaluation_runs_dataset_version_nonempty", sql`length(trim(${table.datasetVersion})) > 0`),
+    check("evaluation_runs_dataset_hash_sha256", sql`${table.datasetHash} ~ '^[a-f0-9]{64}$'`),
+    check("evaluation_runs_case_count_positive", sql`${table.datasetCaseCount} > 0`),
+    check("evaluation_runs_provider_nonempty", sql`length(trim(${table.provider})) > 0`),
+    check("evaluation_runs_generation_model_nonempty", sql`length(trim(${table.generationModel})) > 0`),
+    check("evaluation_runs_judge_model_nonempty", sql`length(trim(${table.judgeModel})) > 0`),
+    check("evaluation_runs_concurrency_positive", sql`${table.concurrency} > 0`),
+    check("evaluation_runs_threshold_version_nonempty", sql`length(trim(${table.thresholdVersion})) > 0`),
+    check("evaluation_runs_completed_after_started", sql`${table.completedAt} >= ${table.startedAt}`),
+  ],
+);
+
+export const evaluationResults = pgTable(
+  "evaluation_results",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    evaluationRunId: uuid("evaluation_run_id")
+      .notNull()
+      .references(() => evaluationRuns.id, { onDelete: "cascade" }),
+    caseId: text("case_id").notNull(),
+    tags: jsonb("tags").$type<EvaluationCaseResult["tags"]>().notNull(),
+    actual: jsonb("actual").$type<EvaluationCaseResult["actual"]>(),
+    scores: jsonb("scores").$type<EvaluationCaseResult["scores"]>().notNull(),
+    passed: boolean("passed").notNull(),
+    latencyMs: integer("latency_ms").notNull(),
+    generationInputTokens: integer("generation_input_tokens").notNull(),
+    generationOutputTokens: integer("generation_output_tokens").notNull(),
+    judgeInputTokens: integer("judge_input_tokens").notNull(),
+    judgeOutputTokens: integer("judge_output_tokens").notNull(),
+    retryCount: integer("retry_count").notNull(),
+    error: jsonb("error").$type<EvaluationCaseResult["error"]>(),
+  },
+  (table) => [
+    unique("evaluation_results_run_case_unique").on(table.evaluationRunId, table.caseId),
+    index("evaluation_results_run_case_idx").on(table.evaluationRunId, table.caseId),
+    check("evaluation_results_case_id_nonempty", sql`length(trim(${table.caseId})) > 0`),
+    check("evaluation_results_latency_nonnegative", sql`${table.latencyMs} >= 0`),
+    check("evaluation_results_generation_input_nonnegative", sql`${table.generationInputTokens} >= 0`),
+    check("evaluation_results_generation_output_nonnegative", sql`${table.generationOutputTokens} >= 0`),
+    check("evaluation_results_judge_input_nonnegative", sql`${table.judgeInputTokens} >= 0`),
+    check("evaluation_results_judge_output_nonnegative", sql`${table.judgeOutputTokens} >= 0`),
+    check("evaluation_results_retry_nonnegative", sql`${table.retryCount} >= 0`),
   ],
 );

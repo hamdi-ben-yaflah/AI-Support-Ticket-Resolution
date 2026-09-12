@@ -1,0 +1,62 @@
+CREATE TABLE "evaluation_results" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"evaluation_run_id" uuid NOT NULL,
+	"case_id" text NOT NULL,
+	"tags" jsonb NOT NULL,
+	"actual" jsonb,
+	"scores" jsonb NOT NULL,
+	"passed" boolean NOT NULL,
+	"latency_ms" integer NOT NULL,
+	"generation_input_tokens" integer NOT NULL,
+	"generation_output_tokens" integer NOT NULL,
+	"judge_input_tokens" integer NOT NULL,
+	"judge_output_tokens" integer NOT NULL,
+	"retry_count" integer NOT NULL,
+	"error" jsonb,
+	CONSTRAINT "evaluation_results_run_case_unique" UNIQUE("evaluation_run_id","case_id"),
+	CONSTRAINT "evaluation_results_case_id_nonempty" CHECK (length(trim("evaluation_results"."case_id")) > 0),
+	CONSTRAINT "evaluation_results_latency_nonnegative" CHECK ("evaluation_results"."latency_ms" >= 0),
+	CONSTRAINT "evaluation_results_generation_input_nonnegative" CHECK ("evaluation_results"."generation_input_tokens" >= 0),
+	CONSTRAINT "evaluation_results_generation_output_nonnegative" CHECK ("evaluation_results"."generation_output_tokens" >= 0),
+	CONSTRAINT "evaluation_results_judge_input_nonnegative" CHECK ("evaluation_results"."judge_input_tokens" >= 0),
+	CONSTRAINT "evaluation_results_judge_output_nonnegative" CHECK ("evaluation_results"."judge_output_tokens" >= 0),
+	CONSTRAINT "evaluation_results_retry_nonnegative" CHECK ("evaluation_results"."retry_count" >= 0)
+);
+--> statement-breakpoint
+CREATE TABLE "evaluation_runs" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"schema_version" text NOT NULL,
+	"status" text NOT NULL,
+	"dataset_version" text NOT NULL,
+	"dataset_hash" text NOT NULL,
+	"dataset_case_count" integer NOT NULL,
+	"provider" text NOT NULL,
+	"generation_model" text NOT NULL,
+	"judge_model" text NOT NULL,
+	"prompt_versions" jsonb NOT NULL,
+	"retrieval_config" jsonb NOT NULL,
+	"resolution_policy" jsonb NOT NULL,
+	"concurrency" integer NOT NULL,
+	"pricing" jsonb,
+	"threshold_version" text NOT NULL,
+	"thresholds" jsonb NOT NULL,
+	"summary" jsonb NOT NULL,
+	"started_at" timestamp with time zone NOT NULL,
+	"completed_at" timestamp with time zone NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "evaluation_runs_schema_version_nonempty" CHECK (length(trim("evaluation_runs"."schema_version")) > 0),
+	CONSTRAINT "evaluation_runs_status_valid" CHECK ("evaluation_runs"."status" in ('pass', 'regression')),
+	CONSTRAINT "evaluation_runs_dataset_version_nonempty" CHECK (length(trim("evaluation_runs"."dataset_version")) > 0),
+	CONSTRAINT "evaluation_runs_dataset_hash_sha256" CHECK ("evaluation_runs"."dataset_hash" ~ '^[a-f0-9]{64}$'),
+	CONSTRAINT "evaluation_runs_case_count_positive" CHECK ("evaluation_runs"."dataset_case_count" > 0),
+	CONSTRAINT "evaluation_runs_provider_nonempty" CHECK (length(trim("evaluation_runs"."provider")) > 0),
+	CONSTRAINT "evaluation_runs_generation_model_nonempty" CHECK (length(trim("evaluation_runs"."generation_model")) > 0),
+	CONSTRAINT "evaluation_runs_judge_model_nonempty" CHECK (length(trim("evaluation_runs"."judge_model")) > 0),
+	CONSTRAINT "evaluation_runs_concurrency_positive" CHECK ("evaluation_runs"."concurrency" > 0),
+	CONSTRAINT "evaluation_runs_threshold_version_nonempty" CHECK (length(trim("evaluation_runs"."threshold_version")) > 0),
+	CONSTRAINT "evaluation_runs_completed_after_started" CHECK ("evaluation_runs"."completed_at" >= "evaluation_runs"."started_at")
+);
+--> statement-breakpoint
+ALTER TABLE "evaluation_results" ADD CONSTRAINT "evaluation_results_evaluation_run_id_evaluation_runs_id_fk" FOREIGN KEY ("evaluation_run_id") REFERENCES "public"."evaluation_runs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "evaluation_results_run_case_idx" ON "evaluation_results" USING btree ("evaluation_run_id","case_id");--> statement-breakpoint
+CREATE INDEX "evaluation_runs_completed_idx" ON "evaluation_runs" USING btree ("completed_at","id");

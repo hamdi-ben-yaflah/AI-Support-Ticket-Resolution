@@ -26,7 +26,7 @@ type ViewState =
   | { name: "success"; traceId: string; proposal: ResolutionProposal }
   | { name: "failure"; traceId?: string; code?: ApiErrorCode; retryable: boolean };
 
-const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
+const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   invalid_request: "The ticket input was rejected. Check its length and customer tier.",
   provider_timeout: "The model took too long to respond. You can try this ticket again.",
   provider_unavailable: "The model service is temporarily unavailable. You can try again.",
@@ -349,7 +349,7 @@ export function TicketResolutionForm() {
             <p className="text-sm font-semibold text-[#8f312b]">Resolution not available</p>
             <p className="mt-1 text-sm leading-6 text-[#854d48]">
               {state.code
-                ? ERROR_MESSAGES[state.code]
+                ? ERROR_MESSAGES[state.code] ?? ERROR_MESSAGES.internal_error
                 : "The response could not be verified. Check your connection and try again."}
             </p>
             {state.traceId && (

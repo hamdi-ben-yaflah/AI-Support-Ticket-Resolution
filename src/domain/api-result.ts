@@ -11,6 +11,8 @@ export const ApiErrorCodeSchema = z.enum([
   "source_not_found",
   "source_unavailable",
   "configuration_error",
+  "evaluation_not_found",
+  "evaluation_incompatible",
   "internal_error",
 ]);
 
