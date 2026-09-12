@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { TicketResolutionForm } from "@/app/ticket-resolution-form";
 
 export default function Home() {
@@ -17,9 +19,17 @@ export default function Home() {
               <p className="text-xs text-[#69736f]">Resolution copilot</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-[#d9d8cf] bg-white px-3 py-1.5 text-xs font-medium text-[#53605b]">
-            <span className="size-2 rounded-full bg-[#40a879]" aria-hidden="true" />
-            Human-controlled
+          <div className="flex items-center gap-3">
+            <Link
+              href="/admin/evaluations"
+              className="text-xs font-semibold text-[#285f52] underline decoration-[#9eb9b1] underline-offset-4 hover:text-[#173f36]"
+            >
+              Evaluation lab
+            </Link>
+            <div className="hidden items-center gap-2 rounded-full border border-[#d9d8cf] bg-white px-3 py-1.5 text-xs font-medium text-[#53605b] sm:flex">
+              <span className="size-2 rounded-full bg-[#40a879]" aria-hidden="true" />
+              Human-controlled
+            </div>
           </div>
         </header>
 
