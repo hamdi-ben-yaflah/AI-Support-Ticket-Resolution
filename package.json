@@ -11,6 +11,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "ingest": "NODE_OPTIONS=--conditions=react-server tsx scripts/ingest.ts",
+    "chunks:inspect": "NODE_OPTIONS=--conditions=react-server tsx scripts/inspect-chunks.ts",
     "test:integration": "vitest run --config vitest.integration.config.mts"
   },
   "dependencies": {

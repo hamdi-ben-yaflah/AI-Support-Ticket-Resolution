@@ -1,11 +1,16 @@
 import "server-only";
 
-import { cosineDistance, eq, inArray, sql } from "drizzle-orm";
+import { asc, cosineDistance, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { documentChunks, documents } from "@/db/schema";
-import { ChunkMetadataSchema, DocumentMetadataSchema } from "@/domain/knowledge";
+import {
+  ChunkMetadataSchema,
+  DocumentMetadataSchema,
+  KnowledgeChunkInspectionSchema,
+  type KnowledgeChunkInspection,
+} from "@/domain/knowledge";
 
 const SearchRowSchema = z.object({
   chunkId: z.string().uuid(),
@@ -120,6 +125,28 @@ export async function searchDocumentChunks(input: {
     .limit(input.limit);
 
   return z.array(SearchRowSchema).parse(rows);
+}
+
+export async function inspectDocumentChunks(): Promise<
+  KnowledgeChunkInspection[]
+> {
+  const rows = await getDatabase()
+    .select({
+      chunkId: documentChunks.id,
+      sourceId: documents.sourceId,
+      title: documents.title,
+      category: sql<string>`${documents.metadata}->>'category'`,
+      version: sql<string>`${documents.metadata}->>'version'`,
+      chunkIndex: documentChunks.chunkIndex,
+      section: documentChunks.section,
+      tokenCount: documentChunks.tokenCount,
+      content: documentChunks.content,
+    })
+    .from(documentChunks)
+    .innerJoin(documents, eq(documentChunks.documentId, documents.id))
+    .orderBy(asc(documents.sourceId), asc(documentChunks.chunkIndex));
+
+  return z.array(KnowledgeChunkInspectionSchema).parse(rows);
 }
 
 export async function deleteDocumentsBySourceIds(sourceIds: readonly string[]): Promise<void> {

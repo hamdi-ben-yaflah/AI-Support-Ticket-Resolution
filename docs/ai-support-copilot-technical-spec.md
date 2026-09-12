@@ -87,6 +87,7 @@ data/
   evals/golden.jsonl
 scripts/
   ingest.ts
+  inspect-chunks.ts
   eval.ts
 tests/
 ```
@@ -258,7 +259,7 @@ Store aggregate configuration and per-case scores. Large raw results may alterna
 Command:
 
 ```bash
-npm run ingest
+pnpm ingest
 ```
 
 Pipeline:
@@ -273,6 +274,14 @@ Pipeline:
 8. Delete superseded chunks within the same transaction.
 
 Chunk boundaries must favor coherent policies and procedures over uniform size.
+
+Inspect the persisted chunks after ingestion with:
+
+```bash
+pnpm chunks:inspect
+```
+
+The command emits deterministic JSON lines containing the chunk UUID, stable source metadata, chunk index, heading path, token count, and exact synthetic content. It must omit embedding vectors, internal document IDs, hashes, timestamps, similarity values, and secrets.
 
 ## 9. Retrieval
 
@@ -596,12 +605,12 @@ Secrets belong in `.env.local` or the deployment secret manager. Commit only `.e
 
 ```bash
 podman compose up -d
-npm install
-npm run db:migrate
-npm run ingest
-npm run dev
-npm run test
-npm run eval
+pnpm install
+pnpm db:migrate
+pnpm ingest
+pnpm chunks:inspect
+pnpm dev
+pnpm test
 ```
 
 Exact scripts must be documented in the README and kept consistent with `package.json`.
