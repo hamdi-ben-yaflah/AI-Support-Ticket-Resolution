@@ -9,7 +9,7 @@ Do not use outside knowledge. Partial, merely related, or contradictory evidence
 Return exactly one decision for every citation ID and no others.`;
 
 export function buildCitationJudgeInput(execution: ResolutionExecution): string {
-  if (execution.proposal.action !== "reply") return "No citations.";
+  if (execution.proposal.action === "needs_human_review") return "No citations.";
   const claims = new Map(
     execution.proposal.groundedReply.citations.map((citation) => [
       citation.chunkId,

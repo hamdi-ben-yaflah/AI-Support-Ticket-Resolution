@@ -42,7 +42,7 @@ export default function EvaluationsPage() {
               </p>
             </div>
             <div className="rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-sm">
-              <p className="font-semibold text-[#f8e28e]">golden.v1</p>
+              <p className="font-semibold text-[#f8e28e]">golden.v2</p>
               <p className="mt-1 text-[#dce6e2]">36 synthetic cases · persisted history</p>
             </div>
           </div>

@@ -219,4 +219,174 @@ describe("TicketResolutionForm", () => {
     await user.click(screen.getByRole("button", { name: "Resolve ticket" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("could not be verified");
   });
+
+  it("shows pending mock arguments and confirms exactly once on a double click", async () => {
+    const user = userEvent.setup();
+    const chunkId = "223e4567-e89b-42d3-a456-426614174000";
+    const proposalId = "323e4567-e89b-42d3-a456-426614174000";
+    const reason = "The settled duplicate-charge policy supports a refund review.";
+    let resolveConfirmation!: (value: unknown) => void;
+    const confirmationJson = new Promise((resolve) => {
+      resolveConfirmation = resolve;
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        json: async () => ({
+          ok: true,
+          traceId,
+          data: {
+            category: "billing",
+            priority: "medium",
+            summary: "Two settled duplicate invoices were reported.",
+            confidence: 0.94,
+            action: "request_refund_review",
+            reason,
+            groundedReply: {
+              suggestedResponse: "I can submit these duplicate charges for review.",
+              citations: [{
+                chunkId,
+                sourceId: "duplicate-charges",
+                section: "When both charges settled",
+                claim: "Settled duplicates may be reviewed.",
+              }],
+            },
+            actionProposal: {
+              proposalId,
+              toolName: "requestRefundReview",
+              state: "pending_confirmation",
+              arguments: {
+                reason,
+                ticketSummary: "Two settled duplicate invoices were reported.",
+                evidenceChunkIds: [chunkId],
+              },
+            },
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        json: async () => ({
+          ok: true,
+          traceId,
+          data: {
+            chunkId,
+            sourceId: "duplicate-charges",
+            title: "Duplicate charges",
+            section: "When both charges settled",
+            content: "Both settled duplicates may be submitted for review.",
+          },
+        }),
+      })
+      .mockResolvedValueOnce({ json: () => confirmationJson });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<TicketResolutionForm />);
+    await user.type(
+      screen.getByRole("textbox", { name: /ticket text/i }),
+      "Invoices INV-1 and INV-2 are settled duplicates.",
+    );
+    await user.click(screen.getByRole("button", { name: "Resolve ticket" }));
+
+    expect(await screen.findByText("Mock review proposal ready")).toBeInTheDocument();
+    expect(screen.getByText("requestRefundReview")).toBeInTheDocument();
+    expect(screen.getByText("pending_confirmation")).toBeInTheDocument();
+    expect(screen.getAllByText(reason)).toHaveLength(2);
+    expect(screen.getAllByText(chunkId).length).toBeGreaterThan(0);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const confirm = screen.getByRole("button", { name: "Confirm mock review" });
+    await user.dblClick(confirm);
+    expect(screen.getByRole("button", { name: /recording mock review/i })).toBeDisabled();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      `/api/actions/refund-review/${proposalId}/confirm`,
+      expect.objectContaining({
+        method: "POST",
+        credentials: "same-origin",
+        body: '{"confirmed":true}',
+      }),
+    );
+
+    resolveConfirmation({
+      ok: true,
+      traceId,
+      data: {
+        proposalId,
+        status: "mock_review_recorded",
+        message: "A local mock record was created. No refund was approved or issued.",
+        executedAt: "2026-09-12T10:00:00.000Z",
+      },
+    });
+    expect(await screen.findByText("Local mock review recorded")).toBeInTheDocument();
+    expect(screen.getByText(/No refund was approved or issued/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Confirm again/ })).toBeEnabled();
+  });
+
+  it("rejects a refund proposal locally without sending a confirmation request", async () => {
+    const user = userEvent.setup();
+    const chunkId = "223e4567-e89b-42d3-a456-426614174000";
+    const reason = "The settled duplicate-charge policy supports a refund review.";
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        json: async () => ({
+          ok: true,
+          traceId,
+          data: {
+            category: "billing",
+            priority: "medium",
+            summary: "Two settled duplicate invoices were reported.",
+            confidence: 0.94,
+            action: "request_refund_review",
+            reason,
+            groundedReply: {
+              suggestedResponse: "I can submit these charges for review.",
+              citations: [{
+                chunkId,
+                sourceId: "duplicate-charges",
+                section: "When both charges settled",
+                claim: "Settled duplicates may be reviewed.",
+              }],
+            },
+            actionProposal: {
+              proposalId: "323e4567-e89b-42d3-a456-426614174000",
+              toolName: "requestRefundReview",
+              state: "pending_confirmation",
+              arguments: {
+                reason,
+                ticketSummary: "Two settled duplicate invoices were reported.",
+                evidenceChunkIds: [chunkId],
+              },
+            },
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        json: async () => ({
+          ok: true,
+          traceId,
+          data: {
+            chunkId,
+            sourceId: "duplicate-charges",
+            title: "Duplicate charges",
+            section: "When both charges settled",
+            content: "Settled duplicates may be reviewed.",
+          },
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<TicketResolutionForm />);
+    await user.type(
+      screen.getByRole("textbox", { name: /ticket text/i }),
+      "Invoices INV-1 and INV-2 are settled duplicates.",
+    );
+    await user.click(screen.getByRole("button", { name: "Resolve ticket" }));
+    await user.click(await screen.findByRole("button", { name: "Reject proposal" }));
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "No confirmation request was sent",
+    );
+    expect(screen.queryByRole("button", { name: "Confirm mock review" })).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });

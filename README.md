@@ -1,6 +1,6 @@
 # AI Support Ticket Resolution Copilot
 
-This repository implements core stories 1–4 and 6–8: a support agent can submit synthetic ticket text, receive a validated classification, and either review a grounded proposed reply with exact cited knowledge chunks or see an explicit insufficient-evidence warning. Engineers can ingest the synthetic knowledge base, inspect persisted chunks, run a versioned golden evaluation from the CLI or a local admin page, and compare persisted baseline/candidate runs. Replies require human review; nothing is sent and no customer action is performed.
+This repository implements core stories 1–8: a support agent can submit synthetic ticket text, receive a validated classification, review a grounded proposed reply or refund-review proposal with exact cited knowledge chunks, and see an explicit insufficient-evidence warning. A refund-review proposal requires a separate session-owned confirmation and creates only an idempotent local mock audit result. Engineers can ingest the synthetic knowledge base, inspect persisted chunks, run a versioned golden evaluation from the CLI or a local admin page, and compare persisted baseline/candidate runs. Nothing is sent, no refund is approved or issued, and no customer or payment state is changed.
 
 Anthropic is the only text-generation provider. Voyage AI is used only for 1,024-dimensional embeddings: ingestion uses `document` input type and ticket retrieval uses `query` input type. PostgreSQL with pgvector stores the documents and vectors; retrieval applies the classified category first and broadens only when evidence is insufficient.
 
@@ -39,11 +39,11 @@ Start the app:
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Use synthetic tickets only; ticket text is sent to Anthropic for classification and, when confidence and retrieval permit, grounded resolution. It is never written to application telemetry or storage. Successful runs retain only a keyed ticket hash, redacted model metadata, the validated classification/action, and immutable snapshots of cited chunks for replies. Successful abstentions retain no cited-source rows.
+Open [http://localhost:3000](http://localhost:3000). Use synthetic tickets only; ticket text is sent to Anthropic for classification and, when confidence and retrieval permit, grounded resolution. It is never written to application telemetry or storage. Successful runs retain only a keyed ticket hash, redacted model metadata, the validated classification/action, and immutable snapshots of cited chunks for grounded outcomes. Refund-review outcomes atomically add an opaque `pending_confirmation` audit row. Successful abstentions retain no cited-source rows.
 
 ## Evaluation suite
 
-The committed `data/evals/golden.jsonl` contains 36 unique synthetic cases across normal, edge, adversarial, ambiguous, contradictory, and unanswerable scenarios. Every case declares a stable ID, dataset version, ticket input, expected category, allowed priorities/actions, relevant source IDs, abstention label, and tags. Loading fails before provider work for malformed JSONL, blank lines, duplicates, mixed versions, or a case count outside 30–50.
+The committed `data/evals/golden.jsonl` is `golden.v2` and contains 36 unique synthetic cases across normal, edge, adversarial, ambiguous, contradictory, action-ready, and unanswerable scenarios. It includes a policy-complete refund-review case and a confirmation-bypass attempt. Every case declares a stable ID, dataset version, ticket input, expected category, allowed priorities/actions, relevant source IDs, abstention label, and tags. Loading fails before provider work for malformed JSONL, blank lines, duplicates, mixed versions, or a case count outside 30–50.
 
 Run the shared evaluator from the CLI:
 
@@ -65,7 +65,7 @@ To make a meaningful comparison, run `pnpm db:migrate`, execute a baseline with 
 
 ### Latest local live verification
 
-On 2026-09-12, `claude-sonnet-5`, `voyage-4`, `retrieval.v1`, and `resolution-policy.v1` were run over all 36 cases at concurrency 3. The result was correctly reported as a regression and the CLI exited non-zero: schema validity 30.6% (11/36), category accuracy 30.6% (11/36), priority accuracy 25.0% (9/36), retrieval recall@5 0.0% (0/27), abstention accuracy 13.9% (5/36), P50 5,568 ms, and P95 6,485 ms. Citation support was unavailable because no reply reached citation judging. There were 25 sanitized case errors; local telemetry identified Voyage HTTP 429 rate limiting as the dominant cause. Pricing was not configured, so estimated cost remained `null`. This is one environment-specific measurement, not a product guarantee, and its raw ignored report is not checked in.
+On 2026-09-12, `golden.v2` was run with `claude-sonnet-5`, `voyage-4`, `retrieval.v1`, `resolve.v4`, and `resolution-policy.v1` over all 36 cases at concurrency 3. The result was correctly reported as a regression and the CLI exited non-zero: schema validity 30.6% (11/36), category accuracy 30.6% (11/36), priority accuracy 22.2% (8/36), retrieval recall@5 0.0% (0/27), abstention accuracy 13.9% (5/36), P50 5,557 ms, and P95 6,657 ms. Citation support was unavailable because no grounded outcome reached citation judging. There were 25 sanitized case errors; local telemetry identified Voyage HTTP 429 rate limiting as the dominant cause. Pricing was not configured, so estimated cost remained `null`. This is one environment-specific measurement, not a product guarantee, and its raw ignored report is not checked in.
 
 Three representative failure analyses:
 
@@ -92,18 +92,19 @@ Unit tests are deterministic and make no provider calls. Integration tests requi
 
 ## Architecture
 
-- `src/app`: server-rendered shell, narrow client resolution/evaluation interfaces, ticket/source APIs, and strict non-cacheable evaluation run/history/comparison Route Handlers
-- `src/domain`: Zod contracts for ticket input, classification, discriminated reply/human-review outcomes, citations, knowledge metadata/inspection, and API errors
+- `src/app`: server-rendered shell, narrow client resolution/evaluation interfaces, ticket/source/refund-confirmation APIs, and strict non-cacheable evaluation run/history/comparison Route Handlers
+- `src/actions`: the single validated, local-only `requestRefundReview` mock boundary
+- `src/domain`: Zod contracts for ticket input, classification, discriminated reply/refund-review/human-review outcomes, action arguments/results, citations, knowledge metadata/inspection, and API errors
 - `src/ai`: provider-neutral Anthropic generation boundary, versioned classification/resolution prompts, grounding validation, and resolution pipeline
 - `src/embeddings`: provider-neutral embedding contract and server-only Voyage AI adapter with deadlines, retries, finite-vector/dimension validation, and redacted telemetry
 - `src/ingestion`: front-matter parsing, Markdown AST semantic sectioning, token-aware chunking, deterministic hashes/indexes, idempotent ingestion, and the validated chunk-inspection output contract
 - `src/retrieval`: category-first cosine retrieval, safe broad fallback, thresholds, deduplication, context budgets, and untrusted evidence delimiters
 - `src/evals`: strict golden/report/history/comparison contracts, versioned dataset loading, deterministic graders and run comparison, advisory citation judging, bounded shared runner, thresholds, safe persistence mapping, and live service composition
-- `src/db`: Drizzle schema, PostgreSQL client, migration-backed persistence, cosine search, document replacement, deterministic chunk inspection, successful resolution/cited-source snapshots, and transactional evaluation run/case history
+- `src/db`: Drizzle schema, PostgreSQL client, migration-backed persistence, cosine search, document replacement, deterministic chunk inspection, successful resolution/cited-source/pending-action transactions, row-locked idempotent mock confirmation, and transactional evaluation run/case history
 - `src/config`: lazy server-only environment validation
 - `src/auth`: anonymous signed HTTP-only session creation/verification and keyed one-way session/ticket hashes
 
-Provider SDK types and secrets stay server-side. The resolve response is a discriminated success: `action: "reply"` includes a bounded rationale, proposed draft, and compact citation metadata; `action: "needs_human_review"` includes a bounded reason and deliberately omits a draft and citations. Low classification confidence, below-threshold retrieval, or model-detected ambiguity/contradiction can produce the human-review outcome. Retrieval/database/embedding unavailability remains a retryable service error, not an abstention. Exact chunk content remains server-side until the browser requests a cited chunk with its signed anonymous session cookie. The source endpoint returns only chunk ID, stable source ID, document title, section, and the immutable cited excerpt; missing, tampered, expired, cross-session, uncited, and unknown access is denied with the same non-revealing response. Source and evaluation-history responses are private and non-cacheable. Accounts and controlled actions/audits remain out of scope.
+Provider SDK types and secrets stay server-side. The resolve response is a discriminated success: `action: "reply"` includes a bounded rationale, proposed draft, and compact citation metadata; `action: "request_refund_review"` is billing-only and adds validated display-safe arguments plus an opaque pending proposal ID; `action: "needs_human_review"` includes a bounded reason and deliberately omits a draft, citations, and action. The model never selects a tool name or executes code. `POST /api/actions/refund-review/:proposalId/confirm` requires exactly `{ "confirmed": true }`, the owning signed session, reparsed stored arguments, and evidence IDs owned by the same resolution. A row lock ensures first, repeated, and concurrent confirmations return one immutable stored mock result. Missing and cross-session proposals share the same non-revealing response, and all confirmation responses are private and non-cacheable.
 
 ## Manual verification
 
@@ -126,3 +127,9 @@ Provider SDK types and secrets stay server-side. The resolve response is a discr
 17. Confirm the version header, candidate-minus-baseline quality/operational deltas, and configuration-drift warnings match the two runs. Filter regressions, improvements, all changed cases, and all cases; confirm only compact actuals, scores, sanitized error codes, and telemetry are shown.
 18. Request a same-ID, invalid/unknown-ID, and deliberately incompatible comparison; confirm controlled 400/404/409 responses with `Cache-Control: private, no-store` and no database or provider detail.
 19. Run `pnpm eval -- --concurrency=3 --output=artifacts/eval-results.json`; confirm it appears in the same history and its exit still reflects threshold status. Remove one live/database prerequisite temporarily and confirm a controlled failure, then restore it.
+20. Submit a synthetic billing ticket with two invoice IDs and two settled charges matching account, plan, billing period, date, and amount; confirm the result is a grounded `request_refund_review` proposal with `pending_confirmation`, display-safe arguments, an opaque proposal ID, and no execution result.
+21. Choose `Reject proposal`; confirm the browser sends no confirmation request and the audit row remains pending with null confirmation, execution, and result fields.
+22. Resolve the action-ready ticket again and choose `Confirm mock review`; confirm exactly one same-origin POST sends `{ "confirmed": true }` and the UI clearly reports a local mock record, not a refund approval or payment effect.
+23. Repeat the confirmation and send two confirmations concurrently; confirm every response returns the same result and timestamp and the stored audit row remains unchanged after its first execution.
+24. Retry confirmation with a missing/tampered cookie, a different browser session, and an unknown UUID; confirm each receives the same non-revealing 404. Send malformed JSON, false confirmation, and extra fields; confirm each receives a safe 400 and no execution occurs.
+25. Submit an incomplete billing request, a technical refund request, and a ticket instructing the model to skip confirmation; confirm missing facts produce an information-request reply, non-billing cannot create an action, and no ticket text can bypass the pending proposal and separate confirmation flow.

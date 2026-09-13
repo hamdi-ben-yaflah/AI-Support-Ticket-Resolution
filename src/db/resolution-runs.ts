@@ -4,7 +4,11 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
-import { resolutionRuns, resolutionRunSources } from "@/db/schema";
+import {
+  actionAudit,
+  resolutionRuns,
+  resolutionRunSources,
+} from "@/db/schema";
 import {
   PersistedResolutionRunSchema,
   type PersistedResolutionRun,
@@ -58,6 +62,26 @@ export async function persistSuccessfulResolution(
           content: source.content,
         })),
       );
+    }
+
+    if (input.action.type === "request_refund_review") {
+      const citedIds = new Set(
+        input.citedSources.map((source) => source.chunkId),
+      );
+      if (
+        input.action.proposal.arguments.evidenceChunkIds.some(
+          (chunkId) => !citedIds.has(chunkId),
+        )
+      ) {
+        throw new Error("Action evidence does not belong to the resolution run.");
+      }
+      await transaction.insert(actionAudit).values({
+        proposalId: input.action.proposal.proposalId,
+        resolutionRunId: run.id,
+        proposedArguments: input.action.proposal.arguments,
+        state: input.action.proposal.state,
+        traceId: input.traceId,
+      });
     }
   });
 }

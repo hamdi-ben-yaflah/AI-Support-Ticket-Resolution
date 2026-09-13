@@ -24,7 +24,7 @@ function pair(): [PersistedEvaluationRun, PersistedEvaluationRun] {
   candidate.runId = "323e4567-e89b-42d3-a456-426614174000";
   candidate.runtime.model = "candidate-model";
   candidate.judgeModel = "candidate-model";
-  candidate.runtime.promptVersions.resolution = "resolve.v4";
+  candidate.runtime.promptVersions.resolution = "resolve.v5";
   candidate.runtime.retrieval.minimumSimilarity = 0.7;
   candidate.metrics.quality.categoryAccuracy = {
     value: 29 / 30,

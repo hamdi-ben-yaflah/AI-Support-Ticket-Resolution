@@ -16,6 +16,10 @@ import {
 
 import type { Classification } from "@/domain/classification";
 import type { ChunkMetadata, DocumentMetadata } from "@/domain/knowledge";
+import type {
+  MockRefundReviewResult,
+  RequestRefundReviewArgs,
+} from "@/domain/refund-review";
 import type { PromptVersions, ResolutionAction } from "@/domain/resolution-run";
 import type {
   EvaluationCaseResult,
@@ -129,6 +133,53 @@ export const resolutionRunSources = pgTable(
     check("resolution_run_sources_title_nonempty", sql`length(trim(${table.title})) > 0`),
     check("resolution_run_sources_section_nonempty", sql`length(trim(${table.section})) > 0`),
     check("resolution_run_sources_content_nonempty", sql`length(trim(${table.content})) > 0`),
+  ],
+);
+
+export const actionAudit = pgTable(
+  "action_audit",
+  {
+    proposalId: uuid("proposal_id").primaryKey(),
+    resolutionRunId: uuid("resolution_run_id")
+      .notNull()
+      .unique()
+      .references(() => resolutionRuns.id, { onDelete: "cascade" }),
+    proposedArguments: jsonb("proposed_arguments")
+      .$type<RequestRefundReviewArgs>()
+      .notNull(),
+    state: text("state").notNull(),
+    traceId: uuid("trace_id").notNull(),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    executedAt: timestamp("executed_at", { withTimezone: true }),
+    result: jsonb("result").$type<MockRefundReviewResult>(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("action_audit_resolution_run_idx").on(table.resolutionRunId),
+    check(
+      "action_audit_state_valid",
+      sql`${table.state} in ('pending_confirmation', 'executed')`,
+    ),
+    check(
+      "action_audit_state_fields_valid",
+      sql`(
+        ${table.state} = 'pending_confirmation'
+        and ${table.confirmedAt} is null
+        and ${table.executedAt} is null
+        and ${table.result} is null
+      ) or (
+        ${table.state} = 'executed'
+        and ${table.confirmedAt} is not null
+        and ${table.executedAt} is not null
+        and ${table.result} is not null
+      )`,
+    ),
+    check(
+      "action_audit_execution_order_valid",
+      sql`${table.executedAt} is null or ${table.confirmedAt} <= ${table.executedAt}`,
+    ),
   ],
 );
 

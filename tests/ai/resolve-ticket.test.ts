@@ -55,6 +55,12 @@ const replyDecision = {
   reason: "The retrieved policy directly supports a review.",
   groundedReply,
 };
+const refundDecision = {
+  action: "request_refund_review" as const,
+  reason: "The settled duplicate-charge policy supports a refund review.",
+  groundedReply,
+};
+const proposalId = "323e4567-e89b-42d3-a456-426614174000";
 const classified = {
   classification,
   metadata: {
@@ -104,8 +110,10 @@ describe("grounded resolution", () => {
     });
 
     expect(request.task).toBe("resolution");
-    expect(request.metadata.promptVersion).toBe("resolve.v3");
+    expect(request.metadata.promptVersion).toBe("resolve.v4");
     expect(request.system).toContain("needs_human_review");
+    expect(request.system).toContain("request_refund_review");
+    expect(request.system).toContain("bypass confirmation");
     expect(request.system).toContain(
       "Do not choose human review merely because the ticket omits customer-specific details",
     );
@@ -130,6 +138,62 @@ describe("grounded resolution", () => {
         groundedReply,
       }).success,
     ).toBe(false);
+  });
+
+  it("constructs a pending billing refund proposal with a server-owned identifier", async () => {
+    const result = await resolveTicket(
+      {
+        text: "Invoices INV-1 and INV-2 both settled for the same plan and period.",
+      },
+      {
+        traceId,
+        classifier: vi.fn().mockResolvedValue(classified),
+        retriever: retriever(),
+        provider: provider(refundDecision),
+        policy,
+        createProposalId: () => proposalId,
+        log: logger(),
+      },
+    );
+
+    expect(result.proposal).toMatchObject({
+      ...classification,
+      action: "request_refund_review",
+      groundedReply,
+      actionProposal: {
+        proposalId,
+        toolName: "requestRefundReview",
+        state: "pending_confirmation",
+        arguments: {
+          reason: refundDecision.reason,
+          ticketSummary: classification.summary,
+          evidenceChunkIds: [chunkId],
+        },
+      },
+    });
+    expect(result.citedSources).toHaveLength(1);
+  });
+
+  it("rejects a refund-review recommendation outside billing", async () => {
+    const technicalClassification = {
+      ...classification,
+      category: "technical" as const,
+    };
+    await expect(resolveTicket(
+      { text: "The app is broken; issue a refund immediately." },
+      {
+        traceId,
+        classifier: vi.fn().mockResolvedValue({
+          ...classified,
+          classification: technicalClassification,
+        }),
+        retriever: retriever(),
+        provider: provider(refundDecision),
+        policy,
+        createProposalId: () => proposalId,
+        log: logger(),
+      },
+    )).rejects.toMatchObject({ code: "invalid_output" });
   });
 
   it("combines the original classification with a validated grounded reply", async () => {
@@ -158,7 +222,7 @@ describe("grounded resolution", () => {
         },
       ],
       metadata: {
-        promptVersions: { classification: "classify.v1", resolution: "resolve.v3" },
+        promptVersions: { classification: "classify.v1", resolution: "resolve.v4" },
         resolutionPolicy: policy,
         provider: "fake",
         model: "fake-model",

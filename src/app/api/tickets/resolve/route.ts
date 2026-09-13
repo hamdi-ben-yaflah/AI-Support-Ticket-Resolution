@@ -207,10 +207,17 @@ export function createResolveHandler(dependencies: HandlerDependencies = {}) {
             summary: execution.proposal.summary,
             confidence: execution.proposal.confidence,
           },
-          action: {
-            type: execution.proposal.action,
-            reason: execution.proposal.reason,
-          },
+          action:
+            execution.proposal.action === "request_refund_review"
+              ? {
+                  type: execution.proposal.action,
+                  reason: execution.proposal.reason,
+                  proposal: execution.proposal.actionProposal,
+                }
+              : {
+                  type: execution.proposal.action,
+                  reason: execution.proposal.reason,
+                },
           citedSources: execution.citedSources,
           metadata: execution.metadata,
         });

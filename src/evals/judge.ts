@@ -18,7 +18,7 @@ export async function judgeCitations(input: {
   provider: LlmProvider;
   traceId: string;
 }): Promise<GenerateResult<CitationJudgeOutput> | null> {
-  if (input.execution.proposal.action !== "reply") return null;
+  if (input.execution.proposal.action === "needs_human_review") return null;
 
   const expectedIds = input.execution.proposal.groundedReply.citations.map(
     (citation) => citation.chunkId,

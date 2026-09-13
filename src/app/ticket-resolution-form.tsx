@@ -5,15 +5,23 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createApiResultSchema, type ApiErrorCode } from "@/domain/api-result";
 import {
   type Citation,
+  type RefundReviewResolutionProposal,
   type ReplyResolutionProposal,
   ResolutionProposalSchema,
   type ResolutionProposal,
 } from "@/domain/grounded-reply";
+import {
+  MockRefundReviewResultSchema,
+  type MockRefundReviewResult,
+} from "@/domain/refund-review";
 import { SourceDetailSchema, type SourceDetail } from "@/domain/source";
 import { TicketInputSchema, type TicketInput } from "@/domain/ticket";
 
 const ResolutionResultSchema = createApiResultSchema(ResolutionProposalSchema);
 const SourceResultSchema = createApiResultSchema(SourceDetailSchema);
+const ConfirmationResultSchema = createApiResultSchema(
+  MockRefundReviewResultSchema,
+);
 
 type SourceState =
   | { name: "loading" }
@@ -26,6 +34,18 @@ type ViewState =
   | { name: "success"; traceId: string; proposal: ResolutionProposal }
   | { name: "failure"; traceId?: string; code?: ApiErrorCode; retryable: boolean };
 
+type RefundActionState =
+  | { name: "pending" }
+  | { name: "confirming" }
+  | { name: "executed"; result: MockRefundReviewResult; traceId: string }
+  | { name: "rejected" }
+  | {
+      name: "failure";
+      traceId?: string;
+      code?: ApiErrorCode;
+      retryable: boolean;
+    };
+
 const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   invalid_request: "The ticket input was rejected. Check its length and customer tier.",
   provider_timeout: "The model took too long to respond. You can try this ticket again.",
@@ -36,6 +56,8 @@ const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   model_output_invalid: "The model result did not pass validation. Send it for human review.",
   source_not_found: "The cited source is not available for this session.",
   source_unavailable: "The cited source is temporarily unavailable.",
+  action_not_found: "This mock proposal is not available for the current session.",
+  action_unavailable: "The mock action is temporarily unavailable. You can retry it.",
   configuration_error: "The resolution service is not configured. Contact an engineer.",
   internal_error: "Something unexpected prevented resolution. Contact an engineer.",
 };
@@ -54,15 +76,21 @@ export function TicketResolutionForm() {
   const inFlight = useRef(false);
   const sourceRequestVersion = useRef(0);
   const sourceAbortController = useRef<AbortController | undefined>(undefined);
+  const actionInFlight = useRef(false);
+  const actionRequestVersion = useRef(0);
+  const actionAbortController = useRef<AbortController | undefined>(undefined);
   const [text, setText] = useState("");
   const [customerTier, setCustomerTier] = useState<"" | "standard" | "premium">("");
   const [touched, setTouched] = useState(false);
   const [state, setState] = useState<ViewState>({ name: "idle" });
   const [sourceStates, setSourceStates] = useState<Record<string, SourceState>>({});
+  const [refundActionState, setRefundActionState] =
+    useState<RefundActionState | null>(null);
 
   useEffect(
     () => () => {
       sourceAbortController.current?.abort();
+      actionAbortController.current?.abort();
     },
     [],
   );
@@ -72,6 +100,11 @@ export function TicketResolutionForm() {
   const canSubmit = !inputError && !isProcessing;
 
   function returnToIdle() {
+    actionRequestVersion.current += 1;
+    actionAbortController.current?.abort();
+    actionAbortController.current = undefined;
+    actionInFlight.current = false;
+    setRefundActionState(null);
     if (!inFlight.current) {
       sourceRequestVersion.current += 1;
       sourceAbortController.current?.abort();
@@ -143,7 +176,9 @@ export function TicketResolutionForm() {
     }
   }
 
-  function loadProposalSources(proposal: ReplyResolutionProposal) {
+  function loadProposalSources(
+    proposal: ReplyResolutionProposal | RefundReviewResolutionProposal,
+  ) {
     sourceRequestVersion.current += 1;
     const version = sourceRequestVersion.current;
     sourceAbortController.current?.abort();
@@ -185,6 +220,11 @@ export function TicketResolutionForm() {
     if (!validInput.success) return;
 
     inFlight.current = true;
+    actionRequestVersion.current += 1;
+    actionAbortController.current?.abort();
+    actionAbortController.current = undefined;
+    actionInFlight.current = false;
+    setRefundActionState(null);
     sourceRequestVersion.current += 1;
     sourceAbortController.current?.abort();
     sourceAbortController.current = undefined;
@@ -215,8 +255,13 @@ export function TicketResolutionForm() {
           traceId: result.data.traceId,
           proposal: result.data.data,
         });
-        if (result.data.data.action === "reply") {
+        if (result.data.data.action !== "needs_human_review") {
           loadProposalSources(result.data.data);
+          setRefundActionState(
+            result.data.data.action === "request_refund_review"
+              ? { name: "pending" }
+              : null,
+          );
         } else {
           sourceRequestVersion.current += 1;
           sourceAbortController.current = undefined;
@@ -228,6 +273,81 @@ export function TicketResolutionForm() {
     } finally {
       inFlight.current = false;
     }
+  }
+
+  async function confirmRefundReview(
+    proposal: RefundReviewResolutionProposal,
+  ) {
+    if (
+      actionInFlight.current ||
+      refundActionState?.name === "rejected" ||
+      (refundActionState?.name === "failure" &&
+        !refundActionState.retryable)
+    ) {
+      return;
+    }
+
+    actionInFlight.current = true;
+    actionRequestVersion.current += 1;
+    const version = actionRequestVersion.current;
+    actionAbortController.current?.abort();
+    const controller = new AbortController();
+    actionAbortController.current = controller;
+    setRefundActionState({ name: "confirming" });
+
+    try {
+      const response = await fetch(
+        `/api/actions/refund-review/${encodeURIComponent(proposal.actionProposal.proposalId)}/confirm`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ confirmed: true }),
+          signal: controller.signal,
+        },
+      );
+      const raw: unknown = await response.json();
+      if (version !== actionRequestVersion.current || controller.signal.aborted) {
+        return;
+      }
+      const result = ConfirmationResultSchema.safeParse(raw);
+      if (!result.success) {
+        setRefundActionState({ name: "failure", retryable: false });
+      } else if (!result.data.ok) {
+        setRefundActionState({
+          name: "failure",
+          traceId: result.data.traceId,
+          code: result.data.error.code,
+          retryable: result.data.error.retryable,
+        });
+      } else if (
+        result.data.data.proposalId !== proposal.actionProposal.proposalId
+      ) {
+        setRefundActionState({ name: "failure", retryable: false });
+      } else {
+        setRefundActionState({
+          name: "executed",
+          result: result.data.data,
+          traceId: result.data.traceId,
+        });
+      }
+    } catch {
+      if (version === actionRequestVersion.current && !controller.signal.aborted) {
+        setRefundActionState({ name: "failure", retryable: true });
+      }
+    } finally {
+      if (version === actionRequestVersion.current) {
+        actionInFlight.current = false;
+      }
+    }
+  }
+
+  function rejectRefundReview() {
+    if (actionInFlight.current) return;
+    actionRequestVersion.current += 1;
+    actionAbortController.current?.abort();
+    actionAbortController.current = undefined;
+    setRefundActionState({ name: "rejected" });
   }
 
   return (
@@ -412,7 +532,8 @@ export function TicketResolutionForm() {
           </section>
         )}
 
-        {state.name === "success" && state.proposal.action === "reply" && (
+        {state.name === "success" &&
+          state.proposal.action !== "needs_human_review" && (
           <section className="overflow-hidden rounded-2xl border border-[#bfcfc9] bg-white shadow-[0_14px_32px_rgba(43,63,56,0.07)]">
             <div className="flex flex-col gap-3 border-b border-[#e1e5e1] bg-[#f0f6f3] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -420,7 +541,9 @@ export function TicketResolutionForm() {
                   AI-generated proposal
                 </p>
                 <h3 className="mt-1 text-base font-semibold text-[#213b33]">
-                  Supported draft ready
+                  {state.proposal.action === "request_refund_review"
+                    ? "Mock review proposal ready"
+                    : "Supported draft ready"}
                 </h3>
               </div>
               <span className="w-fit rounded-full border border-[#c5d8d1] bg-white px-3 py-1 text-xs font-semibold text-[#356152]">
@@ -454,6 +577,21 @@ export function TicketResolutionForm() {
                 <p className="mt-3 whitespace-pre-wrap text-[15px] leading-7 text-[#26312d]">
                   {state.proposal.groundedReply.suggestedResponse}
                 </p>
+                {state.proposal.action === "request_refund_review" && (
+                  <RefundReviewControls
+                    proposal={state.proposal}
+                    actionState={refundActionState ?? { name: "pending" }}
+                    onConfirm={() => {
+                      if (
+                        state.name === "success" &&
+                        state.proposal.action === "request_refund_review"
+                      ) {
+                        void confirmRefundReview(state.proposal);
+                      }
+                    }}
+                    onReject={rejectRefundReview}
+                  />
+                )}
                 <div className="mt-5 border-t border-[#e3e7e3] pt-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a8580]">
                     Knowledge citations
@@ -522,6 +660,148 @@ export function TicketResolutionForm() {
           </section>
         )}
       </div>
+    </div>
+  );
+}
+
+function RefundReviewControls({
+  proposal,
+  actionState,
+  onConfirm,
+  onReject,
+}: {
+  proposal: RefundReviewResolutionProposal;
+  actionState: RefundActionState;
+  onConfirm: () => void;
+  onReject: () => void;
+}) {
+  const arguments_ = proposal.actionProposal.arguments;
+  const canConfirm =
+    actionState.name === "pending" ||
+    actionState.name === "executed" ||
+    (actionState.name === "failure" && actionState.retryable);
+
+  return (
+    <div className="mt-5 rounded-xl border border-[#dfc989] bg-[#fffaf0] px-4 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#806021]">
+            Proposed mock action
+          </p>
+          <p className="mt-1 font-mono text-xs font-semibold text-[#5f4212]">
+            {proposal.actionProposal.toolName}
+          </p>
+        </div>
+        <span className="rounded-full border border-[#dfc27f] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#76561d]">
+          {actionState.name === "executed"
+            ? "executed · local mock only"
+            : actionState.name === "rejected"
+              ? "rejected · not executed"
+              : proposal.actionProposal.state}
+        </span>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-[#5c4a2b]">
+        Confirmation creates only a local audit result. It does not approve or
+        issue a refund, change a payment, or contact a customer.
+      </p>
+      <dl className="mt-4 space-y-3 rounded-lg border border-[#ead7ae] bg-white px-4 py-4 text-sm">
+        <div>
+          <dt className="text-xs font-semibold uppercase tracking-[0.1em] text-[#887047]">
+            Reason
+          </dt>
+          <dd className="mt-1 leading-6 text-[#3e3423]">{arguments_.reason}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-semibold uppercase tracking-[0.1em] text-[#887047]">
+            Ticket summary
+          </dt>
+          <dd className="mt-1 leading-6 text-[#3e3423]">
+            {arguments_.ticketSummary}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-semibold uppercase tracking-[0.1em] text-[#887047]">
+            Evidence chunk IDs
+          </dt>
+          <dd className="mt-1 space-y-1 font-mono text-[11px] text-[#5c4a2b]">
+            {arguments_.evidenceChunkIds.map((id) => (
+              <span key={id} className="block break-all">
+                {id}
+              </span>
+            ))}
+          </dd>
+        </div>
+      </dl>
+      <p className="mt-3 break-all font-mono text-[11px] text-[#8b7958]">
+        Proposal {proposal.actionProposal.proposalId}
+      </p>
+
+      {actionState.name === "executed" && (
+        <div role="status" className="mt-4 rounded-lg bg-[#e9f5ef] px-4 py-3 text-sm text-[#245343]">
+          <p className="font-semibold">Local mock review recorded</p>
+          <p className="mt-1 leading-6">{actionState.result.message}</p>
+          <p className="mt-2 font-mono text-[11px]">
+            Executed {actionState.result.executedAt} · Trace {actionState.traceId}
+          </p>
+        </div>
+      )}
+      {actionState.name === "rejected" && (
+        <div role="status" className="mt-4 rounded-lg bg-[#f2f1ec] px-4 py-3 text-sm text-[#53605b]">
+          Proposal rejected locally. No confirmation request was sent and no mock
+          action was executed.
+        </div>
+      )}
+      {actionState.name === "failure" && (
+        <div role="alert" className="mt-4 rounded-lg bg-[#fff0ed] px-4 py-3 text-sm text-[#854d48]">
+          <p className="font-semibold">Mock action not recorded</p>
+          <p className="mt-1 leading-6">
+            {actionState.code
+              ? ERROR_MESSAGES[actionState.code] ?? ERROR_MESSAGES.internal_error
+              : "The confirmation response could not be verified."}
+          </p>
+          {actionState.traceId && (
+            <p className="mt-2 font-mono text-[11px]">
+              Trace {actionState.traceId}
+            </p>
+          )}
+        </div>
+      )}
+
+      {actionState.name !== "rejected" && (
+        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          {actionState.name === "pending" && (
+            <button
+              type="button"
+              onClick={onReject}
+              className="min-h-11 rounded-lg border border-[#c9b67c] bg-white px-4 text-sm font-semibold text-[#67501c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67501c]"
+            >
+              Reject proposal
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={!canConfirm}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#5f4212] px-4 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5f4212] disabled:cursor-not-allowed disabled:bg-[#aaa18d]"
+          >
+            {actionState.name === "confirming" ? (
+              <>
+                <span
+                  className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                  aria-hidden="true"
+                />
+                Recording mock review…
+              </>
+            ) : actionState.name === "executed" ? (
+              "Confirm again (idempotent)"
+            ) : actionState.name === "failure" && actionState.retryable ? (
+              "Retry mock confirmation"
+            ) : (
+              "Confirm mock review"
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

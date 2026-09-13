@@ -4,6 +4,12 @@ import { createApiResultSchema } from "@/domain/api-result";
 import { ClassificationSchema } from "@/domain/classification";
 import { GroundedReplySchema, ResolutionProposalSchema } from "@/domain/grounded-reply";
 import {
+  MockRefundReviewResultSchema,
+  RefundReviewActionProposalSchema,
+  RefundReviewConfirmationSchema,
+  RequestRefundReviewArgsSchema,
+} from "@/domain/refund-review";
+import {
   PersistedResolutionRunSchema,
   ResolutionExecutionSchema,
 } from "@/domain/resolution-run";
@@ -126,6 +132,96 @@ describe("grounded reply schemas", () => {
   });
 });
 
+describe("refund-review schemas", () => {
+  const arguments_ = {
+    reason: "The settled duplicate-charge policy supports a review.",
+    ticketSummary: "Two settled duplicate invoices were reported.",
+    evidenceChunkIds: ["223e4567-e89b-42d3-a456-426614174000"],
+  };
+  const actionProposal = {
+    proposalId: "323e4567-e89b-42d3-a456-426614174000",
+    toolName: "requestRefundReview",
+    state: "pending_confirmation",
+    arguments: arguments_,
+  };
+
+  it("accepts only bounded unique display-safe action arguments", () => {
+    expect(RequestRefundReviewArgsSchema.parse(arguments_)).toEqual(arguments_);
+    expect(RequestRefundReviewArgsSchema.safeParse({
+      ...arguments_,
+      reason: "too short",
+    }).success).toBe(false);
+    expect(RequestRefundReviewArgsSchema.safeParse({
+      ...arguments_,
+      evidenceChunkIds: [
+        arguments_.evidenceChunkIds[0],
+        arguments_.evidenceChunkIds[0],
+      ],
+    }).success).toBe(false);
+    expect(RequestRefundReviewArgsSchema.safeParse({
+      ...arguments_,
+      providerTool: "execute",
+    }).success).toBe(false);
+  });
+
+  it("requires the allowlisted pending proposal and exact positive confirmation", () => {
+    expect(RefundReviewActionProposalSchema.safeParse(actionProposal).success).toBe(true);
+    expect(RefundReviewActionProposalSchema.safeParse({
+      ...actionProposal,
+      toolName: "issueRefund",
+    }).success).toBe(false);
+    expect(RefundReviewConfirmationSchema.safeParse({ confirmed: true }).success).toBe(true);
+    expect(RefundReviewConfirmationSchema.safeParse({ confirmed: false }).success).toBe(false);
+    expect(RefundReviewConfirmationSchema.safeParse({ confirmed: true, force: true }).success).toBe(false);
+  });
+
+  it("accepts only a clearly labeled bounded local mock result", () => {
+    expect(MockRefundReviewResultSchema.safeParse({
+      proposalId: actionProposal.proposalId,
+      status: "mock_review_recorded",
+      message: "A local mock record was created; no refund was issued.",
+      executedAt: "2026-09-12T10:00:00.000Z",
+    }).success).toBe(true);
+    expect(MockRefundReviewResultSchema.safeParse({
+      proposalId: actionProposal.proposalId,
+      status: "refund_issued",
+      message: "Refund complete.",
+      executedAt: "2026-09-12T10:00:00.000Z",
+    }).success).toBe(false);
+  });
+
+  it("allows refund review only for billing with matching citations and arguments", () => {
+    const groundedReply = {
+      suggestedResponse: "I can submit these settled duplicates for review.",
+      citations: [{
+        chunkId: arguments_.evidenceChunkIds[0],
+        sourceId: "duplicate-charges",
+        section: "When both charges settled",
+        claim: "Settled duplicate charges can be reviewed.",
+      }],
+    };
+    const proposal = {
+      category: "billing",
+      priority: "medium",
+      summary: arguments_.ticketSummary,
+      confidence: 0.92,
+      action: "request_refund_review",
+      reason: arguments_.reason,
+      groundedReply,
+      actionProposal,
+    };
+    expect(ResolutionProposalSchema.safeParse(proposal).success).toBe(true);
+    expect(ResolutionProposalSchema.safeParse({ ...proposal, category: "technical" }).success).toBe(false);
+    expect(ResolutionProposalSchema.safeParse({
+      ...proposal,
+      actionProposal: {
+        ...actionProposal,
+        arguments: { ...arguments_, ticketSummary: "Different summary" },
+      },
+    }).success).toBe(false);
+  });
+});
+
 describe("source and resolution-run schemas", () => {
   const source = {
     chunkId: "223e4567-e89b-42d3-a456-426614174000",
@@ -150,7 +246,7 @@ describe("source and resolution-run schemas", () => {
       action: { type: "reply", reason: "The policy supports a response." },
       citedSources: [{ ...source, citationPosition: 0 }],
       metadata: {
-        promptVersions: { classification: "classify.v1", resolution: "resolve.v3" },
+        promptVersions: { classification: "classify.v1", resolution: "resolve.v4" },
         resolutionPolicy: { version: "resolution-policy.v1", minimumConfidence: 0.65 },
         provider: "anthropic",
         model: "test-model",
@@ -185,7 +281,7 @@ describe("source and resolution-run schemas", () => {
       },
       citedSources: [{ ...source, citationPosition: 0 }],
       metadata: {
-        promptVersions: { classification: "classify.v1", resolution: "resolve.v3" },
+        promptVersions: { classification: "classify.v1", resolution: "resolve.v4" },
         resolutionPolicy: { version: "resolution-policy.v1", minimumConfidence: 0.65 },
         provider: "anthropic",
         model: "test-model",
@@ -206,7 +302,7 @@ describe("source and resolution-run schemas", () => {
 
   it("requires zero sources for human review and at least one for reply runs", () => {
     const metadata = {
-      promptVersions: { classification: "classify.v1", resolution: "resolve.v3" },
+      promptVersions: { classification: "classify.v1", resolution: "resolve.v4" },
       resolutionPolicy: { version: "resolution-policy.v1", minimumConfidence: 0.65 },
       provider: "anthropic",
       model: "test-model",

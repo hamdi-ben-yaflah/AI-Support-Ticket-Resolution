@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ClassificationSchema } from "@/domain/classification";
 import { ResolutionProposalSchema } from "@/domain/grounded-reply";
 import { SourceDetailSchema } from "@/domain/source";
+import { RefundReviewActionProposalSchema } from "@/domain/refund-review";
 
 export const PromptVersionsSchema = z
   .object({
@@ -17,6 +18,13 @@ export const ResolutionActionSchema = z
       .object({
         type: z.literal("reply"),
         reason: z.string().trim().min(1).max(300),
+      })
+      .strict(),
+    z
+      .object({
+        type: z.literal("request_refund_review"),
+        reason: z.string().trim().min(10).max(300),
+        proposal: RefundReviewActionProposalSchema,
       })
       .strict(),
     z
@@ -123,6 +131,48 @@ export const PersistedResolutionRunSchema = z
         code: "custom",
         path: ["citedSources"],
         message: "Human-review runs cannot grant cited sources.",
+      });
+    }
+    if (run.action.type === "request_refund_review") {
+      if (run.classification.category !== "billing" || run.citedSources.length === 0) {
+        context.addIssue({
+          code: "custom",
+          path: ["action"],
+          message: "Refund-review runs require billing classification and cited sources.",
+        });
+      }
+      const sourceIds = run.citedSources.map((source) => source.chunkId);
+      const evidenceIds = run.action.proposal.arguments.evidenceChunkIds;
+      if (
+        sourceIds.length !== evidenceIds.length ||
+        sourceIds.some((id, index) => evidenceIds[index] !== id)
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["action", "proposal", "arguments", "evidenceChunkIds"],
+          message: "Refund-review evidence must match this run's cited sources.",
+        });
+      }
+      if (
+        run.action.reason !== run.action.proposal.arguments.reason ||
+        run.classification.summary !==
+          run.action.proposal.arguments.ticketSummary
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["action", "proposal", "arguments"],
+          message: "Refund-review arguments must match the validated resolution.",
+        });
+      }
+    }
+    if (
+      run.action.type !== "request_refund_review" &&
+      "proposal" in run.action
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["action"],
+        message: "Only refund-review runs may persist action proposals.",
       });
     }
   });

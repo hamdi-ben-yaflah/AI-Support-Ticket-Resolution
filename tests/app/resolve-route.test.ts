@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import { LlmError, type LlmErrorCode } from "@/ai/errors";
 import { createResolveHandler } from "@/app/api/tickets/resolve/route";
 import { SessionConfigurationError } from "@/config/session";
-import type { ResolutionProposal } from "@/domain/grounded-reply";
+import type {
+  RefundReviewResolutionProposal,
+  ResolutionProposal,
+} from "@/domain/grounded-reply";
 import type { ResolutionExecution } from "@/domain/resolution-run";
 import type { AppLogger } from "@/observability/logger";
 import { RetrievalError } from "@/retrieval/errors";
@@ -26,7 +29,7 @@ const execution: ResolutionExecution = {
     content: "Settled duplicate charges can be submitted for review.",
   }],
   metadata: {
-    promptVersions: { classification: "classify.v1", resolution: "resolve.v3" },
+    promptVersions: { classification: "classify.v1", resolution: "resolve.v4" },
     resolutionPolicy: { version: "resolution-policy.v1", minimumConfidence: 0.65 },
     provider: "fake",
     model: "fake-model",
@@ -75,6 +78,57 @@ describe("POST /api/tickets/resolve", () => {
     expect(response.headers.get("set-cookie")).toContain("support_copilot_session=signed-cookie");
     expect(response.headers.get("set-cookie")).toContain("HttpOnly");
     expect(JSON.stringify(body)).not.toContain(execution.citedSources[0]?.content);
+  });
+
+  it("persists a pending refund proposal before returning it", async () => {
+    const refundProposal: RefundReviewResolutionProposal = {
+        category: "billing" as const,
+        priority: proposal.priority,
+        summary: proposal.summary,
+        confidence: proposal.confidence,
+        action: "request_refund_review",
+        reason: "The settled duplicate-charge policy supports a refund review.",
+        groundedReply: proposal.groundedReply,
+        actionProposal: {
+          proposalId: "323e4567-e89b-42d3-a456-426614174000",
+          toolName: "requestRefundReview",
+          state: "pending_confirmation",
+          arguments: {
+            reason: "The settled duplicate-charge policy supports a refund review.",
+            ticketSummary: proposal.summary,
+            evidenceChunkIds: [chunkId],
+          },
+        },
+      };
+    const refundExecution: ResolutionExecution = {
+      ...execution,
+      proposal: refundProposal,
+    };
+    const persist = vi.fn().mockResolvedValue(undefined);
+    const response = await createResolveHandler({
+      resolve: vi.fn().mockResolvedValue(refundExecution),
+      persist,
+      createSession: () => session,
+      createTraceId: () => traceId,
+      log: logger(),
+    })(request(JSON.stringify({ text: "Both invoice charges settled." })));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      data: {
+        action: "request_refund_review",
+        actionProposal: { state: "pending_confirmation" },
+      },
+    });
+    expect(persist).toHaveBeenCalledWith(expect.objectContaining({
+      action: {
+        type: "request_refund_review",
+        reason: refundProposal.reason,
+        proposal: refundProposal.actionProposal,
+      },
+      citedSources: refundExecution.citedSources,
+    }));
   });
 
   it("does not return a proposal when its source authorization context cannot be saved", async () => {

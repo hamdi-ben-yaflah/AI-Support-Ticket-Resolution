@@ -30,7 +30,10 @@ export function gradeExecution(input: {
       .map((item) => item.sourceId)
       .filter((sourceId) => expected.relevantSourceIds.includes(sourceId)),
   );
-  const citations = proposal.action === "reply" ? proposal.groundedReply.citations : [];
+  const citations =
+    proposal.action === "needs_human_review"
+      ? []
+      : proposal.groundedReply.citations;
   const retrievedChunkIds = new Set(input.retrieved.map((item) => item.chunkId));
   const existingCitations = citations.filter((item) => retrievedChunkIds.has(item.chunkId));
   const supported = input.judgeDecisions.filter((decision) => decision.supported).length;

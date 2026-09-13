@@ -1,5 +1,7 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
 import { z } from "zod";
 
 import { LlmError, isLlmError } from "@/ai/errors";
@@ -12,7 +14,7 @@ import {
   buildResolutionInput,
   RESOLUTION_PROMPT_VERSION,
   RESOLUTION_SYSTEM_PROMPT,
-} from "@/ai/prompts/resolve.v3";
+} from "@/ai/prompts/resolve.v4";
 import { AnthropicLlmProvider } from "@/ai/providers/anthropic";
 import type { GenerateRequest, GenerateResult, LlmProvider } from "@/ai/types";
 import { getAiConfig } from "@/config/ai";
@@ -27,6 +29,7 @@ import {
   ResolutionReasonSchema,
   type GroundedReply,
 } from "@/domain/grounded-reply";
+import { RequestRefundReviewArgsSchema } from "@/domain/refund-review";
 import {
   ResolutionExecutionSchema,
   type ResolutionExecution,
@@ -40,13 +43,17 @@ import type { EvidenceRetriever, RetrievedEvidence } from "@/retrieval/types";
 
 const ResolutionDecisionSchema = z
   .object({
-    action: z.enum(["reply", "needs_human_review"]),
+    action: z.enum(["reply", "request_refund_review", "needs_human_review"]),
     reason: ResolutionReasonSchema,
     groundedReply: GroundedReplySchema.nullable(),
   })
   .strict()
   .superRefine((decision, context) => {
-    if (decision.action === "reply" && decision.groundedReply === null) {
+    if (
+      (decision.action === "reply" ||
+        decision.action === "request_refund_review") &&
+      decision.groundedReply === null
+    ) {
       context.addIssue({
         code: "custom",
         path: ["groundedReply"],
@@ -79,6 +86,7 @@ type ResolveTicketOptions = ResolutionContext & {
   retriever: EvidenceRetriever;
   provider: LlmProvider;
   policy: ResolutionPolicy;
+  createProposalId?: () => string;
   log?: AppLogger;
 };
 
@@ -189,6 +197,7 @@ function createGeneratedExecution(input: {
   policy: ResolutionPolicy;
   provider: LlmProvider;
   pipelineStartedAt: number;
+  createProposalId: () => string;
 }): ResolutionExecution {
   const metadata = createExecutionMetadata({
     classified: input.classified,
@@ -220,6 +229,41 @@ function createGeneratedExecution(input: {
     input.decision.groundedReply,
     input.evidence,
   );
+  const citedSources = createCitedSources(groundedReply, input.evidence);
+
+  if (input.decision.action === "request_refund_review") {
+    if (input.classification.category !== "billing") {
+      throw new LlmError(
+        "invalid_output",
+        "Refund review is not allowed for this ticket category.",
+        { retryable: false },
+      );
+    }
+    const actionArguments = RequestRefundReviewArgsSchema.parse({
+      reason: input.decision.reason,
+      ticketSummary: input.classification.summary,
+      evidenceChunkIds: groundedReply.citations.map(
+        (citation) => citation.chunkId,
+      ),
+    });
+    return ResolutionExecutionSchema.parse({
+      proposal: ResolutionProposalSchema.parse({
+        ...input.classification,
+        action: input.decision.action,
+        reason: input.decision.reason,
+        groundedReply,
+        actionProposal: {
+          proposalId: input.createProposalId(),
+          toolName: "requestRefundReview",
+          state: "pending_confirmation",
+          arguments: actionArguments,
+        },
+      }),
+      citedSources,
+      metadata,
+    });
+  }
+
   return ResolutionExecutionSchema.parse({
     proposal: ResolutionProposalSchema.parse({
       ...input.classification,
@@ -227,7 +271,7 @@ function createGeneratedExecution(input: {
       reason: input.decision.reason,
       groundedReply,
     }),
-    citedSources: createCitedSources(groundedReply, input.evidence),
+    citedSources,
     metadata,
   });
 }
@@ -326,6 +370,7 @@ export async function resolveTicket(
       policy: options.policy,
       provider: options.provider,
       pipelineStartedAt,
+      createProposalId: options.createProposalId ?? randomUUID,
     });
 
     log.info({

@@ -1,4 +1,7 @@
-import type { ResolutionExecution } from "@/domain/resolution-run";
+import {
+  ResolutionExecutionSchema,
+  type ResolutionExecution,
+} from "@/domain/resolution-run";
 import type { GoldenCase } from "@/evals/contracts";
 import type { GoldenDataset } from "@/evals/dataset";
 import { runEvaluation } from "@/evals/runner";
@@ -10,7 +13,7 @@ export const evaluationChunkId = "223e4567-e89b-42d3-a456-426614174000";
 export function makeGoldenCases(count = 30): GoldenCase[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `eval-case-${String(index + 1).padStart(2, "0")}`,
-    datasetVersion: "golden.v1",
+    datasetVersion: "golden.v2",
     ticket: { text: `Synthetic ticket text number ${index + 1} for evaluation.` },
     expected: {
       category: "billing",
@@ -63,7 +66,7 @@ export function makeExecution(): ResolutionExecution {
       content: "Two settled duplicate charges may be submitted for review.",
     }],
     metadata: {
-      promptVersions: { classification: "classify.v1", resolution: "resolve.v3" },
+      promptVersions: { classification: "classify.v1", resolution: "resolve.v4" },
       resolutionPolicy: { version: "resolution-policy.v1", minimumConfidence: 0.65 },
       provider: "fake",
       model: "fake-model",
@@ -76,10 +79,36 @@ export function makeExecution(): ResolutionExecution {
   };
 }
 
+export function makeRefundExecution(): ResolutionExecution {
+  const execution = makeExecution();
+  if (execution.proposal.action !== "reply") {
+    throw new Error("Expected the evaluation fixture to contain a reply.");
+  }
+  const reason = "The settled duplicate-charge policy supports a refund review.";
+  return ResolutionExecutionSchema.parse({
+    ...execution,
+    proposal: {
+      ...execution.proposal,
+      action: "request_refund_review",
+      reason,
+      actionProposal: {
+        proposalId: "423e4567-e89b-42d3-a456-426614174000",
+        toolName: "requestRefundReview",
+        state: "pending_confirmation",
+        arguments: {
+          reason,
+          ticketSummary: execution.proposal.summary,
+          evidenceChunkIds: [evaluationChunkId],
+        },
+      },
+    },
+  });
+}
+
 export async function makeEvaluationReport() {
   const cases = makeGoldenCases();
   const dataset: GoldenDataset = {
-    version: "golden.v1",
+    version: "golden.v2",
     sha256: "a".repeat(64),
     cases,
   };
@@ -89,7 +118,7 @@ export async function makeEvaluationReport() {
     runtime: {
       provider: "fake",
       model: "fake-model",
-      promptVersions: { classification: "classify.v1", resolution: "resolve.v3" },
+      promptVersions: { classification: "classify.v1", resolution: "resolve.v4" },
       retrieval: {
         version: "retrieval.v1",
         candidateCount: 8,

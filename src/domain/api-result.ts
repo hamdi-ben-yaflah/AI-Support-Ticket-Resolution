@@ -10,6 +10,8 @@ export const ApiErrorCodeSchema = z.enum([
   "model_output_invalid",
   "source_not_found",
   "source_unavailable",
+  "action_not_found",
+  "action_unavailable",
   "configuration_error",
   "evaluation_not_found",
   "evaluation_incompatible",

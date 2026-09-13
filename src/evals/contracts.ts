@@ -3,8 +3,12 @@ import { z } from "zod";
 import { CATEGORIES, PRIORITIES } from "@/domain/classification";
 import { CUSTOMER_TIERS } from "@/domain/ticket";
 
-export const EVALUATION_ACTIONS = ["reply", "needs_human_review"] as const;
-export const EVALUATION_DATASET_VERSION = "golden.v1" as const;
+export const EVALUATION_ACTIONS = [
+  "reply",
+  "request_refund_review",
+  "needs_human_review",
+] as const;
+export const EVALUATION_DATASET_VERSION = "golden.v2" as const;
 export const EVALUATION_THRESHOLD_VERSION = "evaluation-thresholds.v1" as const;
 
 const UniqueStringsSchema = z

@@ -7,7 +7,11 @@ import { LlmError } from "@/ai/errors";
 import type { LlmProvider } from "@/ai/types";
 import { parseEvaluationCliArguments } from "@/evals/cli-options";
 import { parseGoldenDataset } from "@/evals/dataset";
-import { aggregateQualityMetrics, nearestRankPercentile } from "@/evals/graders";
+import {
+  aggregateQualityMetrics,
+  gradeExecution,
+  nearestRankPercentile,
+} from "@/evals/graders";
 import { judgeCitations } from "@/evals/judge";
 import { runEvaluation } from "@/evals/runner";
 import {
@@ -15,6 +19,7 @@ import {
   evaluationTraceId,
   makeEvidence,
   makeExecution,
+  makeRefundExecution,
   makeGoldenCases,
 } from "../support/evaluation";
 
@@ -29,6 +34,14 @@ describe("golden evaluation dataset", () => {
       new Set(["billing", "technical", "account", "other"]),
     );
     expect(dataset.cases.some((item) => item.tags.includes("prompt-injection"))).toBe(true);
+    expect(dataset.cases.some((item) =>
+      item.expected.actions.includes("request_refund_review") &&
+      item.tags.includes("action-ready")
+    )).toBe(true);
+    expect(dataset.cases.some((item) =>
+      item.expected.actions.includes("request_refund_review") &&
+      item.tags.includes("confirmation-bypass")
+    )).toBe(true);
     expect(dataset.cases.some((item) => item.expected.shouldAbstain)).toBe(true);
   });
 
@@ -36,7 +49,7 @@ describe("golden evaluation dataset", () => {
     const item = JSON.stringify(makeGoldenCases(1)[0]);
     expect(() => parseGoldenDataset(`${item}\n\n${item}`)).toThrow("blank line");
     expect(() => parseGoldenDataset(Array.from({ length: 30 }, () => item).join("\n"))).toThrow("Duplicate");
-    expect(() => parseGoldenDataset(item.replace("golden.v1", "golden.v2"))).toThrow();
+    expect(() => parseGoldenDataset(item.replace("golden.v2", "golden.v1"))).toThrow();
     expect(() => parseGoldenDataset(item)).toThrow();
   });
 });
@@ -121,6 +134,53 @@ describe("citation judge", () => {
     await expect(judgeCitations({ execution: makeExecution(), provider, traceId: evaluationTraceId }))
       .rejects.toMatchObject({ code: "invalid_output" });
   });
+
+  it("judges and grades refund-review citations without exposing action arguments", async () => {
+    const execution = makeRefundExecution();
+    const provider = {
+      name: "fake",
+      model: "fake",
+      generateStructured: vi.fn().mockResolvedValue({
+        value: {
+          decisions: [{
+            citationId: evaluationChunkId,
+            supported: true,
+            rationale: "Direct support.",
+          }],
+        },
+        model: "fake",
+        finishReason: "end_turn",
+        usage: { inputTokens: 1, outputTokens: 1 },
+        latencyMs: 1,
+        retryCount: 0,
+      }),
+    } as unknown as LlmProvider;
+    const judged = await judgeCitations({
+      execution,
+      provider,
+      traceId: evaluationTraceId,
+    });
+    const goldenCase = makeGoldenCases(1)[0]!;
+    goldenCase.expected.actions = ["request_refund_review"];
+    const scores = gradeExecution({
+      goldenCase,
+      execution,
+      retrieved: makeEvidence(),
+      judgeDecisions: judged?.value.decisions ?? [],
+    });
+
+    expect(provider.generateStructured).toHaveBeenCalledOnce();
+    expect(scores).toMatchObject({
+      actionCorrect: true,
+      citationExistence: 1,
+      citationSupport: 1,
+      abstentionCorrect: true,
+    });
+    expect(JSON.stringify({
+      action: execution.proposal.action,
+      citedChunkIds: execution.citedSources.map((source) => source.chunkId),
+    })).not.toContain("proposalId");
+  });
 });
 
 describe("shared evaluation runner", () => {
@@ -130,12 +190,12 @@ describe("shared evaluation runner", () => {
     let active = 0;
     let maximumActive = 0;
     const report = await runEvaluation({
-      dataset: { version: "golden.v1", sha256: "b".repeat(64), cases },
+      dataset: { version: "golden.v2", sha256: "b".repeat(64), cases },
       concurrency: 3,
       runtime: {
         provider: "fake",
         model: "fake-model",
-        promptVersions: { classification: "classify.v1", resolution: "resolve.v3" },
+        promptVersions: { classification: "classify.v1", resolution: "resolve.v4" },
         retrieval: { version: "retrieval.v1", candidateCount: 8, finalCount: 5, minimumSimilarity: 0.65, maximumContextTokens: 3_500, minimumEvidenceCount: 1 },
         resolutionPolicy: { version: "resolution-policy.v1", minimumConfidence: 0.65 },
         pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 2 },
@@ -172,11 +232,11 @@ describe("shared evaluation runner", () => {
   it("continues after isolated resolution and judge failures", async () => {
     const cases = makeGoldenCases();
     const report = await runEvaluation({
-      dataset: { version: "golden.v1", sha256: "c".repeat(64), cases },
+      dataset: { version: "golden.v2", sha256: "c".repeat(64), cases },
       concurrency: 2,
       runtime: {
         provider: "fake", model: "fake-model",
-        promptVersions: { classification: "classify.v1", resolution: "resolve.v3" },
+        promptVersions: { classification: "classify.v1", resolution: "resolve.v4" },
         retrieval: { version: "retrieval.v1", candidateCount: 8, finalCount: 5, minimumSimilarity: 0.65, maximumContextTokens: 3_500, minimumEvidenceCount: 1 },
         resolutionPolicy: { version: "resolution-policy.v1", minimumConfidence: 0.65 },
         pricing: null,
