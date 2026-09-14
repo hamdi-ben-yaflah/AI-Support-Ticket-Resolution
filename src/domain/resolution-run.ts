@@ -12,28 +12,27 @@ export const PromptVersionsSchema = z
   })
   .strict();
 
-export const ResolutionActionSchema = z
-  .discriminatedUnion("type", [
-    z
-      .object({
-        type: z.literal("reply"),
-        reason: z.string().trim().min(1).max(300),
-      })
-      .strict(),
-    z
-      .object({
-        type: z.literal("request_refund_review"),
-        reason: z.string().trim().min(10).max(300),
-        proposal: RefundReviewActionProposalSchema,
-      })
-      .strict(),
-    z
-      .object({
-        type: z.literal("needs_human_review"),
-        reason: z.string().trim().min(1).max(300),
-      })
-      .strict(),
-  ]);
+export const ResolutionActionSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("reply"),
+      reason: z.string().trim().min(1).max(300),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("request_refund_review"),
+      reason: z.string().trim().min(10).max(300),
+      proposal: RefundReviewActionProposalSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("needs_human_review"),
+      reason: z.string().trim().min(1).max(300),
+    })
+    .strict(),
+]);
 
 export const ResolutionPolicyMetadataSchema = z
   .object({
@@ -155,8 +154,7 @@ export const PersistedResolutionRunSchema = z
       }
       if (
         run.action.reason !== run.action.proposal.arguments.reason ||
-        run.classification.summary !==
-          run.action.proposal.arguments.ticketSummary
+        run.classification.summary !== run.action.proposal.arguments.ticketSummary
       ) {
         context.addIssue({
           code: "custom",
@@ -165,10 +163,7 @@ export const PersistedResolutionRunSchema = z
         });
       }
     }
-    if (
-      run.action.type !== "request_refund_review" &&
-      "proposal" in run.action
-    ) {
+    if (run.action.type !== "request_refund_review" && "proposal" in run.action) {
       context.addIssue({
         code: "custom",
         path: ["action"],

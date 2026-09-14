@@ -41,11 +41,7 @@ export const KnowledgeChunkInspectionSchema = z
   })
   .strict();
 
-export type KnowledgeDocumentFrontMatter = z.infer<
-  typeof KnowledgeDocumentFrontMatterSchema
->;
+export type KnowledgeDocumentFrontMatter = z.infer<typeof KnowledgeDocumentFrontMatterSchema>;
 export type DocumentMetadata = z.infer<typeof DocumentMetadataSchema>;
 export type ChunkMetadata = z.infer<typeof ChunkMetadataSchema>;
-export type KnowledgeChunkInspection = z.infer<
-  typeof KnowledgeChunkInspectionSchema
->;
+export type KnowledgeChunkInspection = z.infer<typeof KnowledgeChunkInspectionSchema>;

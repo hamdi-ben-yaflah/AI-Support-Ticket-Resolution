@@ -32,29 +32,17 @@ export const RefundReviewActionProposalSchema = z
   })
   .strict();
 
-export const RefundReviewConfirmationSchema = z
-  .object({ confirmed: z.literal(true) })
-  .strict();
+export const RefundReviewConfirmationSchema = z.object({ confirmed: z.literal(true) }).strict();
 
 export const MockRefundReviewResultSchema = z
   .object({
     proposalId: z.string().uuid(),
     status: z.literal("mock_review_recorded"),
-    message: z
-      .string()
-      .trim()
-      .min(1)
-      .max(300),
+    message: z.string().trim().min(1).max(300),
     executedAt: z.string().datetime({ offset: true }),
   })
   .strict();
 
-export type RequestRefundReviewArgs = z.infer<
-  typeof RequestRefundReviewArgsSchema
->;
-export type RefundReviewActionProposal = z.infer<
-  typeof RefundReviewActionProposalSchema
->;
-export type MockRefundReviewResult = z.infer<
-  typeof MockRefundReviewResultSchema
->;
+export type RequestRefundReviewArgs = z.infer<typeof RequestRefundReviewArgsSchema>;
+export type RefundReviewActionProposal = z.infer<typeof RefundReviewActionProposalSchema>;
+export type MockRefundReviewResult = z.infer<typeof MockRefundReviewResultSchema>;

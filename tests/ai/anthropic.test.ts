@@ -128,9 +128,7 @@ describe("AnthropicLlmProvider", () => {
       traceId: request.metadata.traceId,
     });
 
-    await expect(
-      provider(parse).generateStructured(resolutionRequest),
-    ).resolves.toMatchObject({
+    await expect(provider(parse).generateStructured(resolutionRequest)).resolves.toMatchObject({
       value: {
         action: "needs_human_review",
         reason: "The retrieved policies conflict.",

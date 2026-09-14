@@ -43,7 +43,8 @@ export default function Home() {
                 Turn a new ticket into an evidence-backed first reply.
               </h1>
               <p className="mt-6 max-w-lg text-base leading-7 text-[#c6d5d0]">
-                Get a structured classification and a proposed response grounded in the synthetic knowledge base.
+                Get a structured classification and a proposed response grounded in the synthetic
+                knowledge base.
               </p>
             </div>
 

@@ -7,9 +7,7 @@ const AiConfigSchema = z.object({
   LLM_MODEL: z.string().trim().min(1),
   AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(15_000),
   AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
-  LOG_LEVEL: z
-    .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
-    .default("info"),
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
 });
 
 export type AiConfig = {

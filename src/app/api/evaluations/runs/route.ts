@@ -2,15 +2,10 @@ import { randomUUID } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import {
-  EvaluationRepositoryError,
-  listRecentEvaluationRuns,
-} from "@/db/evaluation-runs";
+import { isLiveEvaluationEnabled } from "@/config/deployment";
+import { EvaluationRepositoryError, listRecentEvaluationRuns } from "@/db/evaluation-runs";
 import { createApiResultSchema, type ApiErrorCode, type ApiResult } from "@/domain/api-result";
-import {
-  EvaluationRunListSchema,
-  type EvaluationRunSummary,
-} from "@/evals/comparison-contracts";
+import { EvaluationRunListSchema, type EvaluationRunSummary } from "@/evals/comparison-contracts";
 import { logger, type AppLogger } from "@/observability/logger";
 
 const ResultSchema = createApiResultSchema(EvaluationRunListSchema);
@@ -18,8 +13,16 @@ const ResultSchema = createApiResultSchema(EvaluationRunListSchema);
 type Dependencies = {
   list?: (limit: number) => Promise<EvaluationRunSummary[]>;
   createTraceId?: () => string;
+  isEnabled?: () => boolean;
   log?: AppLogger;
 };
+
+function disabledResponse(): Response {
+  return new Response(null, {
+    status: 404,
+    headers: { "Cache-Control": "private, no-store" },
+  });
+}
 
 function response(
   body: ApiResult<{ runs: EvaluationRunSummary[] }>,
@@ -56,9 +59,12 @@ function parseLimit(request: Request): number | null {
 export function createEvaluationRunsHandler(dependencies: Dependencies = {}) {
   const list = dependencies.list ?? listRecentEvaluationRuns;
   const createTraceId = dependencies.createTraceId ?? randomUUID;
+  const isEnabled = dependencies.isEnabled ?? isLiveEvaluationEnabled;
   const log = dependencies.log ?? logger;
 
   return async function GET(request: Request): Promise<Response> {
+    if (!isEnabled()) return disabledResponse();
+
     const traceId = createTraceId();
     const limit = parseLimit(request);
     if (limit === null) {
@@ -74,7 +80,8 @@ export function createEvaluationRunsHandler(dependencies: Dependencies = {}) {
       const runs = await list(limit);
       return response({ ok: true, traceId, data: { runs } }, 200);
     } catch (error) {
-      const configuration = error instanceof EvaluationRepositoryError && error.code === "unavailable";
+      const configuration =
+        error instanceof EvaluationRepositoryError && error.code === "unavailable";
       log.error({
         event: "evaluation_history_failed",
         traceId,

@@ -2,9 +2,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createEvaluationCompareHandler } from "@/app/api/evaluations/compare/route";
 import { createEvaluationRunsHandler } from "@/app/api/evaluations/runs/route";
-import {
-  EvaluationRepositoryError,
-} from "@/db/evaluation-runs";
+import { EvaluationRepositoryError } from "@/db/evaluation-runs";
 import type { AppLogger } from "@/observability/logger";
 import { EvaluationComparisonError } from "@/evals/comparison";
 import { reportToPersistedRun } from "@/evals/persistence";
@@ -26,6 +24,19 @@ function logger() {
 }
 
 describe("GET /api/evaluations/runs", () => {
+  it("returns a non-revealing 404 when live evaluations are disabled", async () => {
+    const list = vi.fn();
+    const response = await createEvaluationRunsHandler({
+      list,
+      isEnabled: () => false,
+    })(new Request("http://localhost/api/evaluations/runs"));
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(await response.text()).toBe("");
+    expect(list).not.toHaveBeenCalled();
+  });
+
   it("returns bounded safe summaries without caching", async () => {
     const { cases, ...summary } = baseline;
     expect(cases).toHaveLength(30);
@@ -47,9 +58,10 @@ describe("GET /api/evaluations/runs", () => {
     "rejects invalid or ambiguous limit %s",
     async (query) => {
       const list = vi.fn();
-      const response = await createEvaluationRunsHandler({ list, createTraceId: () => evaluationTraceId })(
-        new Request(`http://localhost/api/evaluations/runs?limit=${query}`),
-      );
+      const response = await createEvaluationRunsHandler({
+        list,
+        createTraceId: () => evaluationTraceId,
+      })(new Request(`http://localhost/api/evaluations/runs?limit=${query}`));
       expect(response.status).toBe(400);
       expect(list).not.toHaveBeenCalled();
     },
@@ -57,7 +69,9 @@ describe("GET /api/evaluations/runs", () => {
 
   it("maps unavailable storage without leaking details", async () => {
     const response = await createEvaluationRunsHandler({
-      list: vi.fn().mockRejectedValue(new EvaluationRepositoryError("unavailable", "DATABASE_URL=secret")),
+      list: vi
+        .fn()
+        .mockRejectedValue(new EvaluationRepositoryError("unavailable", "DATABASE_URL=secret")),
       createTraceId: () => evaluationTraceId,
       log: logger(),
     })(new Request("http://localhost/api/evaluations/runs"));
@@ -69,7 +83,21 @@ describe("GET /api/evaluations/runs", () => {
 });
 
 describe("GET /api/evaluations/compare", () => {
-  const url = () => `http://localhost/api/evaluations/compare?baseline=${baseline.runId}&candidate=${candidate.runId}`;
+  const url = () =>
+    `http://localhost/api/evaluations/compare?baseline=${baseline.runId}&candidate=${candidate.runId}`;
+
+  it("returns a non-revealing 404 when live evaluations are disabled", async () => {
+    const load = vi.fn();
+    const response = await createEvaluationCompareHandler({
+      load,
+      isEnabled: () => false,
+    })(new Request(url()));
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(await response.text()).toBe("");
+    expect(load).not.toHaveBeenCalled();
+  });
 
   it("returns a validated non-cacheable comparison", async () => {
     const response = await createEvaluationCompareHandler({
@@ -93,9 +121,10 @@ describe("GET /api/evaluations/compare", () => {
       `baseline=${baseline.runId}&candidate=${candidate.runId}&extra=true`,
       `baseline=${baseline.runId}&baseline=${candidate.runId}&candidate=${candidate.runId}`,
     ]) {
-      const response = await createEvaluationCompareHandler({ load, createTraceId: () => evaluationTraceId })(
-        new Request(`http://localhost/api/evaluations/compare?${query}`),
-      );
+      const response = await createEvaluationCompareHandler({
+        load,
+        createTraceId: () => evaluationTraceId,
+      })(new Request(`http://localhost/api/evaluations/compare?${query}`));
       expect(response.status).toBe(400);
     }
     expect(load).not.toHaveBeenCalled();
@@ -107,14 +136,20 @@ describe("GET /api/evaluations/compare", () => {
       createTraceId: () => evaluationTraceId,
     })(new Request(url()));
     expect(missing.status).toBe(404);
-    await expect(missing.json()).resolves.toMatchObject({ error: { code: "evaluation_not_found" } });
+    await expect(missing.json()).resolves.toMatchObject({
+      error: { code: "evaluation_not_found" },
+    });
 
     const incompatible = await createEvaluationCompareHandler({
       load: vi.fn().mockResolvedValue([baseline, candidate]),
-      compare: vi.fn(() => { throw new EvaluationComparisonError("incompatible_dataset"); }),
+      compare: vi.fn(() => {
+        throw new EvaluationComparisonError("incompatible_dataset");
+      }),
       createTraceId: () => evaluationTraceId,
     })(new Request(url()));
     expect(incompatible.status).toBe(409);
-    await expect(incompatible.json()).resolves.toMatchObject({ error: { code: "evaluation_incompatible" } });
+    await expect(incompatible.json()).resolves.toMatchObject({
+      error: { code: "evaluation_incompatible" },
+    });
   });
 });

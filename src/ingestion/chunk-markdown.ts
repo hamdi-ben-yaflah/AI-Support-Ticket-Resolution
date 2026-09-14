@@ -75,14 +75,18 @@ function tokenize(content: string): number[] {
   return encode(content, { disallowedSpecial: new Set() });
 }
 
-function splitSection(section: SemanticSection): Array<Omit<ParsedChunk, "chunkIndex" | "metadata">> {
+function splitSection(
+  section: SemanticSection,
+): Array<Omit<ParsedChunk, "chunkIndex" | "metadata">> {
   const tokens = tokenize(section.content);
   if (tokens.length <= MAX_CHUNK_TOKENS) {
-    return [{
-      section: section.headingPath,
-      content: section.content.trim(),
-      tokenCount: tokens.length,
-    }];
+    return [
+      {
+        section: section.headingPath,
+        content: section.content.trim(),
+        tokenCount: tokens.length,
+      },
+    ];
   }
 
   const chunks: Array<Omit<ParsedChunk, "chunkIndex" | "metadata">> = [];
@@ -114,9 +118,7 @@ export function parseKnowledgeDocument(
   if (!rawMarkdown.trim()) throw new Error("Knowledge document is empty.");
 
   const parsed = matter(rawMarkdown);
-  const frontMatter = KnowledgeDocumentFrontMatterSchema.safeParse(
-    parsed.data as unknown,
-  );
+  const frontMatter = KnowledgeDocumentFrontMatterSchema.safeParse(parsed.data as unknown);
   if (!frontMatter.success) {
     throw new Error(`Invalid knowledge document front matter in ${sourcePath}.`);
   }
@@ -125,8 +127,9 @@ export function parseKnowledgeDocument(
   }
 
   const metadata = frontMatter.data;
-  const chunks = semanticSections(parsed.content).flatMap(splitSection).map(
-    (chunk, chunkIndex): ParsedChunk => ({
+  const chunks = semanticSections(parsed.content)
+    .flatMap(splitSection)
+    .map((chunk, chunkIndex): ParsedChunk => ({
       ...chunk,
       chunkIndex,
       metadata: {
@@ -134,8 +137,7 @@ export function parseKnowledgeDocument(
         category: metadata.category,
         version: metadata.version,
       },
-    }),
-  );
+    }));
 
   return ParsedKnowledgeDocumentSchema.parse({
     sourcePath,

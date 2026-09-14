@@ -16,15 +16,9 @@ import {
 
 import type { Classification } from "@/domain/classification";
 import type { ChunkMetadata, DocumentMetadata } from "@/domain/knowledge";
-import type {
-  MockRefundReviewResult,
-  RequestRefundReviewArgs,
-} from "@/domain/refund-review";
+import type { MockRefundReviewResult, RequestRefundReviewArgs } from "@/domain/refund-review";
 import type { PromptVersions, ResolutionAction } from "@/domain/resolution-run";
-import type {
-  EvaluationCaseResult,
-  EvaluationReport,
-} from "@/evals/contracts";
+import type { EvaluationCaseResult, EvaluationReport } from "@/evals/contracts";
 
 export const documents = pgTable(
   "documents",
@@ -57,10 +51,7 @@ export const documentChunks = pgTable(
     metadata: jsonb("metadata").$type<ChunkMetadata>().notNull(),
   },
   (table) => [
-    unique("document_chunks_document_index_unique").on(
-      table.documentId,
-      table.chunkIndex,
-    ),
+    unique("document_chunks_document_index_unique").on(table.documentId, table.chunkIndex),
     check("document_chunks_index_nonnegative", sql`${table.chunkIndex} >= 0`),
     check("document_chunks_section_nonempty", sql`length(trim(${table.section})) > 0`),
     check("document_chunks_content_nonempty", sql`length(trim(${table.content})) > 0`),
@@ -75,9 +66,7 @@ export const resolutionRuns = pgTable(
     traceId: uuid("trace_id").notNull().unique(),
     sessionHash: text("session_hash").notNull(),
     ticketHash: text("ticket_hash").notNull(),
-    promptVersions: jsonb("prompt_versions")
-      .$type<PromptVersions>()
-      .notNull(),
+    promptVersions: jsonb("prompt_versions").$type<PromptVersions>().notNull(),
     provider: text("provider").notNull(),
     model: text("model").notNull(),
     resultStatus: text("result_status").notNull(),
@@ -123,10 +112,7 @@ export const resolutionRunSources = pgTable(
       name: "resolution_run_sources_pk",
       columns: [table.resolutionRunId, table.citationPosition],
     }),
-    unique("resolution_run_sources_run_chunk_unique").on(
-      table.resolutionRunId,
-      table.chunkId,
-    ),
+    unique("resolution_run_sources_run_chunk_unique").on(table.resolutionRunId, table.chunkId),
     index("resolution_run_sources_chunk_idx").on(table.chunkId),
     check("resolution_run_sources_position_nonnegative", sql`${table.citationPosition} >= 0`),
     check("resolution_run_sources_source_id_nonempty", sql`length(trim(${table.sourceId})) > 0`),
@@ -144,24 +130,17 @@ export const actionAudit = pgTable(
       .notNull()
       .unique()
       .references(() => resolutionRuns.id, { onDelete: "cascade" }),
-    proposedArguments: jsonb("proposed_arguments")
-      .$type<RequestRefundReviewArgs>()
-      .notNull(),
+    proposedArguments: jsonb("proposed_arguments").$type<RequestRefundReviewArgs>().notNull(),
     state: text("state").notNull(),
     traceId: uuid("trace_id").notNull(),
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
     executedAt: timestamp("executed_at", { withTimezone: true }),
     result: jsonb("result").$type<MockRefundReviewResult>(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("action_audit_resolution_run_idx").on(table.resolutionRunId),
-    check(
-      "action_audit_state_valid",
-      sql`${table.state} in ('pending_confirmation', 'executed')`,
-    ),
+    check("action_audit_state_valid", sql`${table.state} in ('pending_confirmation', 'executed')`),
     check(
       "action_audit_state_fields_valid",
       sql`(
@@ -217,15 +196,27 @@ export const evaluationRuns = pgTable(
     index("evaluation_runs_completed_idx").on(table.completedAt, table.id),
     check("evaluation_runs_schema_version_nonempty", sql`length(trim(${table.schemaVersion})) > 0`),
     check("evaluation_runs_status_valid", sql`${table.status} in ('pass', 'regression')`),
-    check("evaluation_runs_dataset_version_nonempty", sql`length(trim(${table.datasetVersion})) > 0`),
+    check(
+      "evaluation_runs_dataset_version_nonempty",
+      sql`length(trim(${table.datasetVersion})) > 0`,
+    ),
     check("evaluation_runs_dataset_hash_sha256", sql`${table.datasetHash} ~ '^[a-f0-9]{64}$'`),
     check("evaluation_runs_case_count_positive", sql`${table.datasetCaseCount} > 0`),
     check("evaluation_runs_provider_nonempty", sql`length(trim(${table.provider})) > 0`),
-    check("evaluation_runs_generation_model_nonempty", sql`length(trim(${table.generationModel})) > 0`),
+    check(
+      "evaluation_runs_generation_model_nonempty",
+      sql`length(trim(${table.generationModel})) > 0`,
+    ),
     check("evaluation_runs_judge_model_nonempty", sql`length(trim(${table.judgeModel})) > 0`),
     check("evaluation_runs_concurrency_positive", sql`${table.concurrency} > 0`),
-    check("evaluation_runs_threshold_version_nonempty", sql`length(trim(${table.thresholdVersion})) > 0`),
-    check("evaluation_runs_completed_after_started", sql`${table.completedAt} >= ${table.startedAt}`),
+    check(
+      "evaluation_runs_threshold_version_nonempty",
+      sql`length(trim(${table.thresholdVersion})) > 0`,
+    ),
+    check(
+      "evaluation_runs_completed_after_started",
+      sql`${table.completedAt} >= ${table.startedAt}`,
+    ),
   ],
 );
 
@@ -254,8 +245,14 @@ export const evaluationResults = pgTable(
     index("evaluation_results_run_case_idx").on(table.evaluationRunId, table.caseId),
     check("evaluation_results_case_id_nonempty", sql`length(trim(${table.caseId})) > 0`),
     check("evaluation_results_latency_nonnegative", sql`${table.latencyMs} >= 0`),
-    check("evaluation_results_generation_input_nonnegative", sql`${table.generationInputTokens} >= 0`),
-    check("evaluation_results_generation_output_nonnegative", sql`${table.generationOutputTokens} >= 0`),
+    check(
+      "evaluation_results_generation_input_nonnegative",
+      sql`${table.generationInputTokens} >= 0`,
+    ),
+    check(
+      "evaluation_results_generation_output_nonnegative",
+      sql`${table.generationOutputTokens} >= 0`,
+    ),
     check("evaluation_results_judge_input_nonnegative", sql`${table.judgeInputTokens} >= 0`),
     check("evaluation_results_judge_output_nonnegative", sql`${table.judgeOutputTokens} >= 0`),
     check("evaluation_results_retry_nonnegative", sql`${table.retryCount} >= 0`),

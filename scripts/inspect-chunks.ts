@@ -12,9 +12,7 @@ async function main(): Promise<void> {
   for (const chunk of chunks) {
     process.stdout.write(`${inspection.formatKnowledgeChunkInspection(chunk)}\n`);
   }
-  process.stdout.write(
-    `${inspection.formatKnowledgeChunkInspectionSummary(chunks.length)}\n`,
-  );
+  process.stdout.write(`${inspection.formatKnowledgeChunkInspectionSummary(chunks.length)}\n`);
 }
 
 main()

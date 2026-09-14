@@ -4,10 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getVerifiedSessionHash } from "@/auth/session";
-import {
-  ActionAuditRepositoryError,
-  confirmOwnedRefundReview,
-} from "@/db/action-audit";
+import { ActionAuditRepositoryError, confirmOwnedRefundReview } from "@/db/action-audit";
 import { createApiResultSchema, type ApiResult } from "@/domain/api-result";
 import {
   MockRefundReviewResultSchema,
@@ -17,9 +14,7 @@ import {
 import { logger, type AppLogger } from "@/observability/logger";
 
 const ProposalIdSchema = z.string().uuid();
-const ConfirmationResultSchema = createApiResultSchema(
-  MockRefundReviewResultSchema,
-);
+const ConfirmationResultSchema = createApiResultSchema(MockRefundReviewResultSchema);
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
 
 type ConfirmationRouteContext = {
@@ -81,11 +76,8 @@ function unavailable(traceId: string) {
   });
 }
 
-export function createRefundReviewConfirmationHandler(
-  dependencies: HandlerDependencies = {},
-) {
-  const getSessionHash =
-    dependencies.getSessionHash ?? getVerifiedSessionHash;
+export function createRefundReviewConfirmationHandler(dependencies: HandlerDependencies = {}) {
+  const getSessionHash = dependencies.getSessionHash ?? getVerifiedSessionHash;
   const confirm = dependencies.confirm ?? confirmOwnedRefundReview;
   const createTraceId = dependencies.createTraceId ?? randomUUID;
   const log = dependencies.log ?? logger;
@@ -95,9 +87,7 @@ export function createRefundReviewConfirmationHandler(
     context: ConfirmationRouteContext,
   ): Promise<Response> {
     const traceId = createTraceId();
-    const proposalId = ProposalIdSchema.safeParse(
-      (await context.params).proposalId,
-    );
+    const proposalId = ProposalIdSchema.safeParse((await context.params).proposalId);
     if (!proposalId.success) {
       log.warn({
         event: "refund_review_confirmation_rejected",
@@ -126,10 +116,7 @@ export function createRefundReviewConfirmationHandler(
         proposalId: proposalId.data,
         reason: "confirmation_required",
       });
-      return invalidRequest(
-        traceId,
-        "Explicit confirmation is required for this mock action.",
-      );
+      return invalidRequest(traceId, "Explicit confirmation is required for this mock action.");
     }
 
     try {
@@ -159,10 +146,7 @@ export function createRefundReviewConfirmationHandler(
       });
       return response(200, { ok: true, traceId, data: result });
     } catch (error) {
-      if (
-        error instanceof ActionAuditRepositoryError &&
-        error.code === "not_found"
-      ) {
+      if (error instanceof ActionAuditRepositoryError && error.code === "not_found") {
         log.warn({
           event: "refund_review_confirmation_denied",
           traceId,

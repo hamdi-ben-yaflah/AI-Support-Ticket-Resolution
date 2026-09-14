@@ -12,7 +12,7 @@
 
 # testing
 /coverage
-/artifacts/eval-results*.json
+/artifacts/
 
 # next.js
 /.next/

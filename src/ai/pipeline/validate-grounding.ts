@@ -1,8 +1,5 @@
 import { LlmError } from "@/ai/errors";
-import {
-  GroundedReplySchema,
-  type GroundedReply,
-} from "@/domain/grounded-reply";
+import { GroundedReplySchema, type GroundedReply } from "@/domain/grounded-reply";
 import type { RetrievedEvidence } from "@/retrieval/types";
 
 export function validateGroundedReply(

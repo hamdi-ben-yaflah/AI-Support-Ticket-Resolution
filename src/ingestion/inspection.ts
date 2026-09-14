@@ -2,9 +2,7 @@ import { z } from "zod";
 
 import { KnowledgeChunkInspectionSchema } from "@/domain/knowledge";
 
-export function formatKnowledgeChunkInspection(
-  value: unknown,
-): string {
+export function formatKnowledgeChunkInspection(value: unknown): string {
   const chunk = KnowledgeChunkInspectionSchema.parse(value);
   return JSON.stringify({ event: "knowledge_chunk", ...chunk });
 }

@@ -1,0 +1,82 @@
+name: Live AI evaluation
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: live-ai-evaluation
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "24"
+  PNPM_VERSION: "11.21.0"
+  DATABASE_URL: postgresql://support_copilot_eval:support_copilot_eval@127.0.0.1:5432/support_copilot_eval_test
+
+jobs:
+  evaluate:
+    name: Evaluate golden dataset
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: ai-evaluation
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.1-pg17@sha256:3e8b3adfd27b5707128f60956f62a793c3c9326ea8cfaf0eab7adccb5d700b21
+        env:
+          POSTGRES_DB: support_copilot_eval_test
+          POSTGRES_PASSWORD: support_copilot_eval
+          POSTGRES_USER: support_copilot_eval
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U support_copilot_eval -d support_copilot_eval_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Activate pnpm
+        run: corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Apply committed migrations
+        run: pnpm db:migrate
+      - name: Ingest synthetic knowledge base
+        env:
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        run: pnpm ingest
+      - name: Run versioned live evaluation
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          APP_VERSION: ${{ github.sha }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        run: pnpm eval -- --concurrency=3 --output=artifacts/eval-results.json
+      - name: Record evaluation revision
+        if: ${{ always() }}
+        run: |
+          echo "Dataset and prompt source revision: ${GITHUB_SHA}" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Workflow run: ${GITHUB_RUN_ID}" >> "${GITHUB_STEP_SUMMARY}"
+      - name: Upload redacted evaluation report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ai-evaluation-${{ github.sha }}-${{ github.run_id }}
+          path: artifacts/eval-results.json
+          if-no-files-found: warn
+          retention-days: 14

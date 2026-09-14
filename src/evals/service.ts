@@ -19,14 +19,13 @@ import { createConfiguredEvidenceRetriever } from "@/retrieval/search";
 
 export async function runConfiguredEvaluation(concurrency = 3) {
   try {
-    const [dataset, aiConfig, retrievalConfig, resolutionPolicy, pricing] =
-      await Promise.all([
-        loadGoldenDataset(),
-        Promise.resolve(getAiConfig()),
-        Promise.resolve(getRetrievalConfig()),
-        Promise.resolve(getResolutionPolicy()),
-        Promise.resolve(getEvaluationPricing()),
-      ]);
+    const [dataset, aiConfig, retrievalConfig, resolutionPolicy, pricing] = await Promise.all([
+      loadGoldenDataset(),
+      Promise.resolve(getAiConfig()),
+      Promise.resolve(getRetrievalConfig()),
+      Promise.resolve(getResolutionPolicy()),
+      Promise.resolve(getEvaluationPricing()),
+    ]);
     const provider = new AnthropicLlmProvider({
       apiKey: aiConfig.anthropicApiKey,
       model: aiConfig.model,

@@ -6,11 +6,7 @@ import { resolve } from "node:path";
 
 import { z } from "zod";
 
-import {
-  EVALUATION_DATASET_VERSION,
-  GoldenCaseSchema,
-  type GoldenCase,
-} from "@/evals/contracts";
+import { EVALUATION_DATASET_VERSION, GoldenCaseSchema, type GoldenCase } from "@/evals/contracts";
 import { EvaluationSetupError } from "@/evals/errors";
 
 export type GoldenDataset = {
@@ -21,9 +17,7 @@ export type GoldenDataset = {
 
 export function parseGoldenDataset(contents: string): GoldenDataset {
   const normalized = contents.replaceAll("\r\n", "\n");
-  const withoutTrailingNewline = normalized.endsWith("\n")
-    ? normalized.slice(0, -1)
-    : normalized;
+  const withoutTrailingNewline = normalized.endsWith("\n") ? normalized.slice(0, -1) : normalized;
   const lines = withoutTrailingNewline.split("\n");
 
   if (lines.some((line) => line.trim().length === 0)) {

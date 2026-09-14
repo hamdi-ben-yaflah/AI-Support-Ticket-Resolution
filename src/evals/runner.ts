@@ -211,17 +211,14 @@ async function mapBounded<T, R>(
 ): Promise<R[]> {
   const output = new Array<R>(values.length);
   let nextIndex = 0;
-  const workers = Array.from(
-    { length: Math.min(concurrency, values.length) },
-    async () => {
-      while (nextIndex < values.length) {
-        const index = nextIndex;
-        nextIndex += 1;
-        const value = values[index];
-        if (value !== undefined) output[index] = await task(value);
-      }
-    },
-  );
+  const workers = Array.from({ length: Math.min(concurrency, values.length) }, async () => {
+    while (nextIndex < values.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const value = values[index];
+      if (value !== undefined) output[index] = await task(value);
+    }
+  });
   await Promise.all(workers);
   return output;
 }
@@ -240,8 +237,7 @@ function estimateCost(
     0,
   );
   return (
-    (inputTokens * pricing.inputUsdPerMillion +
-      outputTokens * pricing.outputUsdPerMillion) /
+    (inputTokens * pricing.inputUsdPerMillion + outputTokens * pricing.outputUsdPerMillion) /
     1_000_000
   );
 }

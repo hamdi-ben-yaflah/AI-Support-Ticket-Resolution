@@ -3,11 +3,7 @@ import { z } from "zod";
 import { CATEGORIES, PRIORITIES } from "@/domain/classification";
 import { CUSTOMER_TIERS } from "@/domain/ticket";
 
-export const EVALUATION_ACTIONS = [
-  "reply",
-  "request_refund_review",
-  "needs_human_review",
-] as const;
+export const EVALUATION_ACTIONS = ["reply", "request_refund_review", "needs_human_review"] as const;
 export const EVALUATION_DATASET_VERSION = "golden.v2" as const;
 export const EVALUATION_THRESHOLD_VERSION = "evaluation-thresholds.v1" as const;
 
@@ -21,7 +17,10 @@ const UniqueStringsSchema = z
 
 export const GoldenCaseSchema = z
   .object({
-    id: z.string().regex(/^eval-[a-z0-9-]+$/).max(80),
+    id: z
+      .string()
+      .regex(/^eval-[a-z0-9-]+$/)
+      .max(80),
     datasetVersion: z.literal(EVALUATION_DATASET_VERSION),
     ticket: z
       .object({
@@ -33,10 +32,7 @@ export const GoldenCaseSchema = z
       .object({
         category: z.enum(CATEGORIES),
         priorities: z.array(z.enum(PRIORITIES)).min(1).max(PRIORITIES.length),
-        actions: z
-          .array(z.enum(EVALUATION_ACTIONS))
-          .min(1)
-          .max(EVALUATION_ACTIONS.length),
+        actions: z.array(z.enum(EVALUATION_ACTIONS)).min(1).max(EVALUATION_ACTIONS.length),
         relevantSourceIds: UniqueStringsSchema.max(8),
         shouldAbstain: z.boolean(),
       })
@@ -144,7 +140,10 @@ export const EvaluationCaseErrorSchema = z
 
 export const EvaluationCaseResultSchema = z
   .object({
-    caseId: z.string().regex(/^eval-[a-z0-9-]+$/).max(80),
+    caseId: z
+      .string()
+      .regex(/^eval-[a-z0-9-]+$/)
+      .max(80),
     tags: UniqueStringsSchema.min(1).max(12),
     expected: ExpectedResultSchema,
     actual: CompactActualSchema.nullable(),

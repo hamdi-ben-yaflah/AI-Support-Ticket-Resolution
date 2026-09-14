@@ -1,7 +1,4 @@
-import {
-  EVALUATION_THRESHOLD_VERSION,
-  type EvaluationQualityMetrics,
-} from "@/evals/contracts";
+import { EVALUATION_THRESHOLD_VERSION, type EvaluationQualityMetrics } from "@/evals/contracts";
 
 export const EVALUATION_THRESHOLDS = {
   schemaValidity: 1,
@@ -12,9 +9,9 @@ export const EVALUATION_THRESHOLDS = {
 } as const;
 
 export function evaluateThresholds(metrics: EvaluationQualityMetrics) {
-  return (Object.entries(EVALUATION_THRESHOLDS) as Array<
-    [keyof typeof EVALUATION_THRESHOLDS, number]
-  >).map(([metric, threshold]) => {
+  return (
+    Object.entries(EVALUATION_THRESHOLDS) as Array<[keyof typeof EVALUATION_THRESHOLDS, number]>
+  ).map(([metric, threshold]) => {
     const actual = metrics[metric].value;
     return {
       metric,

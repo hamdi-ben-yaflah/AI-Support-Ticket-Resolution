@@ -7,27 +7,18 @@ import {
   resolveTicketWithConfiguredProviders,
   type ResolutionContext,
 } from "@/ai/pipeline/resolve-ticket";
-import {
-  getOrCreateResolutionSession,
-  type ResolutionSession,
-} from "@/auth/session";
+import { getOrCreateResolutionSession, type ResolutionSession } from "@/auth/session";
 import { SessionConfigurationError } from "@/config/session";
 import { persistSuccessfulResolution } from "@/db/resolution-runs";
 import { createApiResultSchema, type ApiErrorCode, type ApiResult } from "@/domain/api-result";
 import { ResolutionProposalSchema, type ResolutionProposal } from "@/domain/grounded-reply";
-import type {
-  PersistedResolutionRun,
-  ResolutionExecution,
-} from "@/domain/resolution-run";
+import type { PersistedResolutionRun, ResolutionExecution } from "@/domain/resolution-run";
 import { ResolutionExecutionSchema } from "@/domain/resolution-run";
 import { TicketInputSchema, type TicketInput } from "@/domain/ticket";
 import { logger, type AppLogger } from "@/observability/logger";
 import { isRetrievalError } from "@/retrieval/errors";
 
-type Resolver = (
-  input: TicketInput,
-  context: ResolutionContext,
-) => Promise<ResolutionExecution>;
+type Resolver = (input: TicketInput, context: ResolutionContext) => Promise<ResolutionExecution>;
 
 type HandlerDependencies = {
   resolve?: Resolver;
@@ -193,9 +184,7 @@ export function createResolveHandler(dependencies: HandlerDependencies = {}) {
 
     try {
       const session = createSession(request, input.data.text);
-      const execution = ResolutionExecutionSchema.parse(
-        await resolve(input.data, { traceId }),
-      );
+      const execution = ResolutionExecutionSchema.parse(await resolve(input.data, { traceId }));
       try {
         await persist({
           traceId,
@@ -235,11 +224,7 @@ export function createResolveHandler(dependencies: HandlerDependencies = {}) {
         status: 200,
       });
       if (session.cookie) {
-        response.cookies.set(
-          session.cookie.name,
-          session.cookie.value,
-          session.cookie.options,
-        );
+        response.cookies.set(session.cookie.name, session.cookie.value, session.cookie.options);
       }
       return response;
     } catch (error) {

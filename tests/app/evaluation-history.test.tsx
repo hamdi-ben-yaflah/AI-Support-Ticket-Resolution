@@ -50,9 +50,10 @@ describe("EvaluationHistory", () => {
       const url = String(input);
       return Promise.resolve({
         status: 200,
-        json: async () => url.startsWith("/api/evaluations/runs")
-          ? { ok: true, traceId: evaluationTraceId, data: { runs: summaries() } }
-          : { ok: true, traceId: evaluationTraceId, data: comparison },
+        json: async () =>
+          url.startsWith("/api/evaluations/runs")
+            ? { ok: true, traceId: evaluationTraceId, data: { runs: summaries() } }
+            : { ok: true, traceId: evaluationTraceId, data: comparison },
       });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -60,7 +61,9 @@ describe("EvaluationHistory", () => {
     render(<EvaluationHistory refreshVersion={0} />);
     expect(await screen.findByText("Generation model:")).toBeInTheDocument();
     expect(screen.getAllByText(/fake-model → candidate-model/)).toHaveLength(2);
-    expect(screen.getByText("Configuration drift may confound this comparison")).toBeInTheDocument();
+    expect(
+      screen.getByText("Configuration drift may confound this comparison"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("caption", { name: "Quality metrics" })).toBeInTheDocument();
     expect(screen.getByRole("caption", { name: "Operational metrics" })).toBeInTheDocument();
     expect(screen.getByText("+10")).toBeInTheDocument();
@@ -70,38 +73,52 @@ describe("EvaluationHistory", () => {
     await user.click(screen.getByRole("button", { name: "Improved" }));
     expect(screen.getByText("eval-case-02")).toBeInTheDocument();
     expect(screen.queryByText("eval-case-01")).not.toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([input]) => String(input).startsWith("/api/evaluations/compare?"))).toBe(true);
+    expect(
+      fetchMock.mock.calls.some(([input]) => String(input).startsWith("/api/evaluations/compare?")),
+    ).toBe(true);
   });
 
   it("shows honest empty and malformed-history states", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      status: 200,
-      json: async () => ({ ok: true, traceId: evaluationTraceId, data: { runs: [] } }),
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 200,
+        json: async () => ({ ok: true, traceId: evaluationTraceId, data: { runs: [] } }),
+      }),
+    );
     const { unmount } = render(<EvaluationHistory refreshVersion={0} />);
     expect(await screen.findByText(/No saved runs yet/)).toBeInTheDocument();
     unmount();
 
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 200, json: async () => ({ unsafe: true }) }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ status: 200, json: async () => ({ unsafe: true }) }),
+    );
     render(<EvaluationHistory refreshVersion={0} />);
     expect(await screen.findByRole("alert")).toHaveTextContent("could not be loaded");
   });
 
   it("explains incompatible selections without rendering unsafe API detail", async () => {
-    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => Promise.resolve({
-      status: String(input).startsWith("/api/evaluations/runs") ? 200 : 409,
-      json: async () => String(input).startsWith("/api/evaluations/runs")
-        ? { ok: true, traceId: evaluationTraceId, data: { runs: summaries() } }
-        : {
-            ok: false,
-            traceId: evaluationTraceId,
-            error: {
-              code: "evaluation_incompatible",
-              message: "DATABASE_URL=secret",
-              retryable: false,
-            },
-          },
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) =>
+        Promise.resolve({
+          status: String(input).startsWith("/api/evaluations/runs") ? 200 : 409,
+          json: async () =>
+            String(input).startsWith("/api/evaluations/runs")
+              ? { ok: true, traceId: evaluationTraceId, data: { runs: summaries() } }
+              : {
+                  ok: false,
+                  traceId: evaluationTraceId,
+                  error: {
+                    code: "evaluation_incompatible",
+                    message: "DATABASE_URL=secret",
+                    retryable: false,
+                  },
+                },
+        }),
+      ),
+    );
     render(<EvaluationHistory refreshVersion={0} />);
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("cannot be compared");

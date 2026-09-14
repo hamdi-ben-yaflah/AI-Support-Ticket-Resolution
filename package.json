@@ -5,15 +5,25 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:operations": "node scripts/build-operations.mjs",
     "start": "next start",
     "lint": "eslint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage --reporter=default --reporter=junit --outputFile.junit=artifacts/unit-tests.xml",
     "db:generate": "drizzle-kit generate",
+    "db:check": "node scripts/check-migrations.mjs",
     "db:migrate": "drizzle-kit migrate",
     "ingest": "NODE_OPTIONS=--conditions=react-server tsx scripts/ingest.ts",
     "chunks:inspect": "NODE_OPTIONS=--conditions=react-server tsx scripts/inspect-chunks.ts",
     "eval": "NODE_OPTIONS=--conditions=react-server tsx scripts/eval.ts",
-    "test:integration": "vitest run --config vitest.integration.config.mts"
+    "test:integration": "vitest run --config vitest.integration.config.mts --reporter=default --reporter=junit --outputFile=artifacts/integration-tests.xml",
+    "ci": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm db:check && pnpm test:coverage && pnpm build:operations && pnpm build"
+  },
+  "engines": {
+    "node": ">=24 <25"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
@@ -38,17 +48,20 @@
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
     "@types/mdast": "^4.0.4",
-    "@types/node": "^20",
+    "@types/node": "^24",
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.10",
+    "esbuild": "^0.25.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "jsdom": "^30.0.1",
+    "prettier": "^3.6.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
     "typescript": "^5",
+    "@vitest/coverage-v8": "^5.0.0",
     "vitest": "^5.0.0"
   },
   "packageManager": "pnpm@11.21.0"

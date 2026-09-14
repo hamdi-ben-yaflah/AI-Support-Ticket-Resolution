@@ -13,12 +13,7 @@ const EmbeddingConfigSchema = z.object({
     .refine((value) => value === EMBEDDING_DIMENSIONS)
     .default(EMBEDDING_DIMENSIONS),
   EMBEDDING_BATCH_SIZE: z.coerce.number().int().min(1).max(2_048).default(64),
-  EMBEDDING_REQUEST_TIMEOUT_MS: z.coerce
-    .number()
-    .int()
-    .min(1_000)
-    .max(120_000)
-    .default(20_000),
+  EMBEDDING_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(20_000),
   EMBEDDING_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
 });
 
@@ -31,9 +26,7 @@ export type EmbeddingConfig = {
   maxRetries: number;
 };
 
-export function getEmbeddingConfig(
-  environment: NodeJS.ProcessEnv = process.env,
-): EmbeddingConfig {
+export function getEmbeddingConfig(environment: NodeJS.ProcessEnv = process.env): EmbeddingConfig {
   const parsed = EmbeddingConfigSchema.safeParse(environment);
   if (!parsed.success) {
     throw new Error("Embedding configuration is invalid or incomplete.");

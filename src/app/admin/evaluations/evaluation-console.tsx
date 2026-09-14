@@ -44,7 +44,8 @@ function MetricCard({ label, metric }: { label: string; metric: EvaluationMetric
         {formatPercent(metric.value)}
       </p>
       <p className="mt-1 text-xs text-[#7a8580]">
-        {Number.isInteger(metric.numerator) ? metric.numerator : metric.numerator.toFixed(2)} / {metric.denominator}
+        {Number.isInteger(metric.numerator) ? metric.numerator : metric.numerator.toFixed(2)} /{" "}
+        {metric.denominator}
       </p>
     </div>
   );
@@ -58,7 +59,10 @@ function CaseDetails({ item }: { item: EvaluationReport["cases"][number] }) {
           <span className="font-mono text-xs font-semibold text-[#285f52]">{item.caseId}</span>
           <div className="mt-1 flex flex-wrap gap-1.5">
             {item.tags.map((tag) => (
-              <span key={tag} className="rounded-full bg-[#f0efe9] px-2 py-0.5 text-[11px] text-[#64706b]">
+              <span
+                key={tag}
+                className="rounded-full bg-[#f0efe9] px-2 py-0.5 text-[11px] text-[#64706b]"
+              >
                 {tag}
               </span>
             ))}
@@ -77,23 +81,34 @@ function CaseDetails({ item }: { item: EvaluationReport["cases"][number] }) {
         <div>
           <h3 className="font-semibold text-[#26312d]">Expected</h3>
           <dl className="mt-2 grid grid-cols-[7rem_1fr] gap-y-1 text-xs leading-5">
-            <dt className="text-[#74807b]">Category</dt><dd>{item.expected.category}</dd>
-            <dt className="text-[#74807b]">Priority</dt><dd>{item.expected.priorities.join(" / ")}</dd>
-            <dt className="text-[#74807b]">Action</dt><dd>{item.expected.actions.join(" / ")}</dd>
-            <dt className="text-[#74807b]">Sources</dt><dd>{item.expected.relevantSourceIds.join(", ") || "none"}</dd>
-            <dt className="text-[#74807b]">Abstain</dt><dd>{item.expected.shouldAbstain ? "yes" : "no"}</dd>
+            <dt className="text-[#74807b]">Category</dt>
+            <dd>{item.expected.category}</dd>
+            <dt className="text-[#74807b]">Priority</dt>
+            <dd>{item.expected.priorities.join(" / ")}</dd>
+            <dt className="text-[#74807b]">Action</dt>
+            <dd>{item.expected.actions.join(" / ")}</dd>
+            <dt className="text-[#74807b]">Sources</dt>
+            <dd>{item.expected.relevantSourceIds.join(", ") || "none"}</dd>
+            <dt className="text-[#74807b]">Abstain</dt>
+            <dd>{item.expected.shouldAbstain ? "yes" : "no"}</dd>
           </dl>
         </div>
         <div>
           <h3 className="font-semibold text-[#26312d]">Actual</h3>
           {item.actual ? (
             <dl className="mt-2 grid grid-cols-[7rem_1fr] gap-y-1 text-xs leading-5">
-              <dt className="text-[#74807b]">Category</dt><dd>{item.actual.category}</dd>
-              <dt className="text-[#74807b]">Priority</dt><dd>{item.actual.priority}</dd>
-              <dt className="text-[#74807b]">Action</dt><dd>{item.actual.action}</dd>
-              <dt className="text-[#74807b]">Confidence</dt><dd>{formatPercent(item.actual.confidence)}</dd>
-              <dt className="text-[#74807b]">Retrieved</dt><dd>{item.actual.retrievedSourceIds.join(", ") || "none"}</dd>
-              <dt className="text-[#74807b]">Cited</dt><dd>{item.actual.citedSourceIds.join(", ") || "none"}</dd>
+              <dt className="text-[#74807b]">Category</dt>
+              <dd>{item.actual.category}</dd>
+              <dt className="text-[#74807b]">Priority</dt>
+              <dd>{item.actual.priority}</dd>
+              <dt className="text-[#74807b]">Action</dt>
+              <dd>{item.actual.action}</dd>
+              <dt className="text-[#74807b]">Confidence</dt>
+              <dd>{formatPercent(item.actual.confidence)}</dd>
+              <dt className="text-[#74807b]">Retrieved</dt>
+              <dd>{item.actual.retrievedSourceIds.join(", ") || "none"}</dd>
+              <dt className="text-[#74807b]">Cited</dt>
+              <dd>{item.actual.citedSourceIds.join(", ") || "none"}</dd>
             </dl>
           ) : (
             <p className="mt-2 text-xs text-[#983d35]">No schema-valid execution was produced.</p>
@@ -105,7 +120,9 @@ function CaseDetails({ item }: { item: EvaluationReport["cases"][number] }) {
             {Object.entries(item.scores).map(([name, value]) => (
               <li key={name} className="flex justify-between gap-2 rounded bg-white px-2 py-1">
                 <span>{name}</span>
-                <span className="font-semibold">{typeof value === "boolean" ? (value ? "pass" : "fail") : formatPercent(value)}</span>
+                <span className="font-semibold">
+                  {typeof value === "boolean" ? (value ? "pass" : "fail") : formatPercent(value)}
+                </span>
               </li>
             ))}
           </ul>
@@ -117,7 +134,9 @@ function CaseDetails({ item }: { item: EvaluationReport["cases"][number] }) {
               {item.judgeDecisions.map((decision) => (
                 <li key={decision.citationId} className="rounded bg-white p-2">
                   <p className="font-mono text-[10px] text-[#74807b]">{decision.citationId}</p>
-                  <p className="mt-1 font-semibold">{decision.supported ? "Supported" : "Unsupported"}</p>
+                  <p className="mt-1 font-semibold">
+                    {decision.supported ? "Supported" : "Unsupported"}
+                  </p>
                   <p className="mt-1 leading-5 text-[#59645f]">{decision.rationale}</p>
                 </li>
               ))}
@@ -163,15 +182,20 @@ export function EvaluationConsole() {
       const raw: unknown = await response.json();
       const parsed = EvaluationResultSchema.safeParse(raw);
       if (!parsed.success) {
-        setState({ name: "failure", message: "The evaluation response could not be verified.", retryable: false });
+        setState({
+          name: "failure",
+          message: "The evaluation response could not be verified.",
+          retryable: false,
+        });
       } else if (!parsed.data.ok) {
         setState({
           name: "failure",
-          message: response.status === 409
-            ? "Another evaluation is already running. Wait for it to finish and try again."
-            : parsed.data.error.code === "configuration_error"
-              ? "The live evaluation prerequisites are not configured."
-              : "The evaluation could not be completed.",
+          message:
+            response.status === 409
+              ? "Another evaluation is already running. Wait for it to finish and try again."
+              : parsed.data.error.code === "configuration_error"
+                ? "The live evaluation prerequisites are not configured."
+                : "The evaluation could not be completed.",
           retryable: parsed.data.error.retryable,
         });
       } else {
@@ -180,7 +204,11 @@ export function EvaluationConsole() {
         setHistoryRefreshVersion((value) => value + 1);
       }
     } catch {
-      setState({ name: "failure", message: "The evaluation request failed before completion.", retryable: true });
+      setState({
+        name: "failure",
+        message: "The evaluation request failed before completion.",
+        retryable: true,
+      });
     } finally {
       inFlight.current = false;
     }
@@ -204,9 +232,12 @@ export function EvaluationConsole() {
         <div className="rounded-2xl border border-[#deddd5] bg-white p-5">
           <h2 className="text-xl font-semibold tracking-[-0.025em]">Run controls</h2>
           <p className="mt-2 text-sm leading-6 text-[#68736e]">
-            Runs synchronously. The complete report stays in this tab while its safe comparison summary is saved to PostgreSQL.
+            Runs synchronously. The complete report stays in this tab while its safe comparison
+            summary is saved to PostgreSQL.
           </p>
-          <label htmlFor={concurrencyId} className="mt-5 block text-sm font-semibold">Concurrency</label>
+          <label htmlFor={concurrencyId} className="mt-5 block text-sm font-semibold">
+            Concurrency
+          </label>
           <select
             id={concurrencyId}
             value={concurrency}
@@ -214,7 +245,11 @@ export function EvaluationConsole() {
             onChange={(event) => setConcurrency(Number(event.target.value))}
             className="mt-2 h-11 w-full rounded-xl border border-[#cbcfc9] bg-white px-3 text-sm outline-none focus:border-[#2d6b5c] focus:ring-4 focus:ring-[#2d6b5c]/10"
           >
-            {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
+            {[1, 2, 3, 4, 5].map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
           </select>
           <button
             type="button"
@@ -222,7 +257,17 @@ export function EvaluationConsole() {
             onClick={() => void run()}
             className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#e8ca62] px-5 text-sm font-bold text-[#19372f] transition hover:bg-[#f0d470] disabled:cursor-not-allowed disabled:bg-[#e3e1d8] disabled:text-[#939893]"
           >
-            {state.name === "running" ? <><span aria-hidden="true" className="size-4 animate-spin rounded-full border-2 border-[#19372f]/25 border-t-[#19372f]" />Running evaluation…</> : "Run evaluation"}
+            {state.name === "running" ? (
+              <>
+                <span
+                  aria-hidden="true"
+                  className="size-4 animate-spin rounded-full border-2 border-[#19372f]/25 border-t-[#19372f]"
+                />
+                Running evaluation…
+              </>
+            ) : (
+              "Run evaluation"
+            )}
           </button>
         </div>
 
@@ -230,25 +275,36 @@ export function EvaluationConsole() {
           <h2 className="font-semibold text-[#5f4b16]">Regression thresholds</h2>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {Object.entries(EVALUATION_THRESHOLDS).map(([name, value]) => (
-              <div key={name} className="flex justify-between rounded-lg bg-white/65 px-3 py-2 text-xs">
+              <div
+                key={name}
+                className="flex justify-between rounded-lg bg-white/65 px-3 py-2 text-xs"
+              >
                 <span>{METRIC_LABELS[name as keyof typeof EVALUATION_THRESHOLDS]}</span>
                 <strong>≥ {formatPercent(value)}</strong>
               </div>
             ))}
           </div>
           <p className="mt-4 text-xs leading-5 text-[#756325]">
-            The citation judge uses the configured Anthropic model and is advisory. Optional cost appears only when both evaluation price variables are configured.
+            The citation judge uses the configured Anthropic model and is advisory. Optional cost
+            appears only when both evaluation price variables are configured.
           </p>
         </div>
       </div>
 
       {state.name === "running" ? (
-        <div role="status" aria-live="polite" className="mt-6 rounded-2xl border border-[#bfd6ce] bg-[#eaf4f0] p-5 text-sm text-[#285f52]">
+        <div
+          role="status"
+          aria-live="polite"
+          className="mt-6 rounded-2xl border border-[#bfd6ce] bg-[#eaf4f0] p-5 text-sm text-[#285f52]"
+        >
           Running 36 cases with concurrency {concurrency}. This can take several minutes.
         </div>
       ) : null}
       {state.name === "failure" ? (
-        <div role="alert" className="mt-6 rounded-2xl border border-[#e2aaa4] bg-[#fff0ed] p-5 text-sm text-[#8d3730]">
+        <div
+          role="alert"
+          className="mt-6 rounded-2xl border border-[#e2aaa4] bg-[#fff0ed] p-5 text-sm text-[#8d3730]"
+        >
           <p className="font-semibold">Evaluation failed</p>
           <p className="mt-1">{state.message}</p>
           {state.retryable ? <p className="mt-1">You can try again.</p> : null}
@@ -257,19 +313,34 @@ export function EvaluationConsole() {
 
       {report ? (
         <div className="mt-8">
-          <div role="status" className={`rounded-2xl border p-5 ${report.status === "pass" ? "border-[#9bc8b4] bg-[#e8f5ef] text-[#235d44]" : "border-[#e2aaa4] bg-[#fff0ed] text-[#8d3730]"}`}>
+          <div
+            role="status"
+            className={`rounded-2xl border p-5 ${report.status === "pass" ? "border-[#9bc8b4] bg-[#e8f5ef] text-[#235d44]" : "border-[#e2aaa4] bg-[#fff0ed] text-[#8d3730]"}`}
+          >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.12em]">{report.status === "pass" ? "Quality gate passed" : "Regression detected"}</p>
+                <p className="text-xs font-bold uppercase tracking-[0.12em]">
+                  {report.status === "pass" ? "Quality gate passed" : "Regression detected"}
+                </p>
                 <p className="mt-1 font-mono text-xs">Run {report.runId}</p>
               </div>
-              <button type="button" onClick={downloadReport} className="rounded-xl border border-current px-4 py-2 text-sm font-bold">Download JSON report</button>
+              <button
+                type="button"
+                onClick={downloadReport}
+                className="rounded-xl border border-current px-4 py-2 text-sm font-bold"
+              >
+                Download JSON report
+              </button>
             </div>
           </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {Object.entries(report.metrics.quality).map(([name, metric]) => (
-              <MetricCard key={name} label={METRIC_LABELS[name as keyof typeof METRIC_LABELS]} metric={metric} />
+              <MetricCard
+                key={name}
+                label={METRIC_LABELS[name as keyof typeof METRIC_LABELS]}
+                metric={metric}
+              />
             ))}
           </div>
 
@@ -277,21 +348,65 @@ export function EvaluationConsole() {
             {[
               ["P50 latency", `${report.metrics.operations.latencyP50Ms} ms`],
               ["P95 latency", `${report.metrics.operations.latencyP95Ms} ms`],
-              ["Generation tokens", String(report.metrics.operations.generationInputTokens + report.metrics.operations.generationOutputTokens)],
-              ["Judge tokens", String(report.metrics.operations.judgeInputTokens + report.metrics.operations.judgeOutputTokens)],
-              ["Errors / retries", `${report.metrics.operations.errorCount} / ${report.metrics.operations.retryCount}`],
-              ["Estimated cost", report.metrics.operations.estimatedCostUsd === null ? "Not configured" : `$${report.metrics.operations.estimatedCostUsd.toFixed(4)}`],
-            ].map(([label, value]) => <div key={label}><p className="text-xs text-[#abc0b9]">{label}</p><p className="mt-1 font-semibold text-[#f8e28e]">{value}</p></div>)}
+              [
+                "Generation tokens",
+                String(
+                  report.metrics.operations.generationInputTokens +
+                    report.metrics.operations.generationOutputTokens,
+                ),
+              ],
+              [
+                "Judge tokens",
+                String(
+                  report.metrics.operations.judgeInputTokens +
+                    report.metrics.operations.judgeOutputTokens,
+                ),
+              ],
+              [
+                "Errors / retries",
+                `${report.metrics.operations.errorCount} / ${report.metrics.operations.retryCount}`,
+              ],
+              [
+                "Estimated cost",
+                report.metrics.operations.estimatedCostUsd === null
+                  ? "Not configured"
+                  : `$${report.metrics.operations.estimatedCostUsd.toFixed(4)}`,
+              ],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <p className="text-xs text-[#abc0b9]">{label}</p>
+                <p className="mt-1 font-semibold text-[#f8e28e]">{value}</p>
+              </div>
+            ))}
           </div>
 
           <div className="mt-6 overflow-hidden rounded-2xl border border-[#deddd5] bg-white">
             <div className="flex flex-col gap-3 border-b border-[#deddd5] p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div><h2 className="font-semibold">Case inspection</h2><p className="text-xs text-[#74807b]">{cases.length} of {report.cases.length} cases</p></div>
+              <div>
+                <h2 className="font-semibold">Case inspection</h2>
+                <p className="text-xs text-[#74807b]">
+                  {cases.length} of {report.cases.length} cases
+                </p>
+              </div>
               <div className="flex gap-2" aria-label="Case filter">
-                {(["all", "failed"] as const).map((value) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${filter === value ? "bg-[#173f36] text-white" : "bg-[#f0efe9] text-[#59645f]"}`}>{value === "all" ? "All cases" : "Failed cases"}</button>)}
+                {(["all", "failed"] as const).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={filter === value}
+                    onClick={() => setFilter(value)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold ${filter === value ? "bg-[#173f36] text-white" : "bg-[#f0efe9] text-[#59645f]"}`}
+                  >
+                    {value === "all" ? "All cases" : "Failed cases"}
+                  </button>
+                ))}
               </div>
             </div>
-            {cases.length > 0 ? cases.map((item) => <CaseDetails key={item.caseId} item={item} />) : <p className="p-6 text-sm text-[#68736e]">No failed cases in this report.</p>}
+            {cases.length > 0 ? (
+              cases.map((item) => <CaseDetails key={item.caseId} item={item} />)
+            ) : (
+              <p className="p-6 text-sm text-[#68736e]">No failed cases in this report.</p>
+            )}
           </div>
         </div>
       ) : null}

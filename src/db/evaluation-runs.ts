@@ -17,20 +17,23 @@ import { EvaluationReportSchema, type EvaluationReport } from "@/evals/contracts
 import { reportToPersistedRun } from "@/evals/persistence";
 
 export type EvaluationRepositoryErrorCode =
-  | "not_found"
-  | "invalid_data"
-  | "run_conflict"
-  | "unavailable";
+  "not_found" | "invalid_data" | "run_conflict" | "unavailable";
 
 export class EvaluationRepositoryError extends Error {
-  constructor(readonly code: EvaluationRepositoryErrorCode, cause?: unknown) {
+  constructor(
+    readonly code: EvaluationRepositoryErrorCode,
+    cause?: unknown,
+  ) {
     super("Evaluation history is unavailable.", { cause });
     this.name = "EvaluationRepositoryError";
   }
 }
 
 const LimitSchema = z.number().int().min(1).max(50);
-const RunIdsSchema = z.array(z.string().uuid()).length(2).refine((ids) => ids[0] !== ids[1]);
+const RunIdsSchema = z
+  .array(z.string().uuid())
+  .length(2)
+  .refine((ids) => ids[0] !== ids[1]);
 
 type RunRow = typeof evaluationRuns.$inferSelect;
 type CaseRow = typeof evaluationResults.$inferSelect;
@@ -96,7 +99,10 @@ function stable(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
   const record = value as Record<string, unknown>;
-  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stable(record[key])}`).join(",")}}`;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stable(record[key])}`)
+    .join(",")}}`;
 }
 
 function equivalent(left: PersistedEvaluationRun, right: PersistedEvaluationRun): boolean {
@@ -205,7 +211,10 @@ export async function loadEvaluationRunPair(
   try {
     const [runRows, caseRows] = await Promise.all([
       getDatabase().select().from(evaluationRuns).where(inArray(evaluationRuns.id, ids)),
-      getDatabase().select().from(evaluationResults).where(inArray(evaluationResults.evaluationRunId, ids)),
+      getDatabase()
+        .select()
+        .from(evaluationResults)
+        .where(inArray(evaluationResults.evaluationRunId, ids)),
     ]);
     const byId = new Map(runRows.map((row) => [row.id, row]));
     const baseline = byId.get(ids[0]);

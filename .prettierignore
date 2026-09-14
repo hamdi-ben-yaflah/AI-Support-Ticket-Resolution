@@ -1,0 +1,9 @@
+.next
+artifacts
+build
+coverage
+data
+drizzle/meta
+node_modules
+pnpm-lock.yaml
+prompts

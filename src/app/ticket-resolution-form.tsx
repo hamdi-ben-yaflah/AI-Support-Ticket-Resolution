@@ -10,18 +10,13 @@ import {
   ResolutionProposalSchema,
   type ResolutionProposal,
 } from "@/domain/grounded-reply";
-import {
-  MockRefundReviewResultSchema,
-  type MockRefundReviewResult,
-} from "@/domain/refund-review";
+import { MockRefundReviewResultSchema, type MockRefundReviewResult } from "@/domain/refund-review";
 import { SourceDetailSchema, type SourceDetail } from "@/domain/source";
 import { TicketInputSchema, type TicketInput } from "@/domain/ticket";
 
 const ResolutionResultSchema = createApiResultSchema(ResolutionProposalSchema);
 const SourceResultSchema = createApiResultSchema(SourceDetailSchema);
-const ConfirmationResultSchema = createApiResultSchema(
-  MockRefundReviewResultSchema,
-);
+const ConfirmationResultSchema = createApiResultSchema(MockRefundReviewResultSchema);
 
 type SourceState =
   | { name: "loading" }
@@ -84,8 +79,7 @@ export function TicketResolutionForm() {
   const [touched, setTouched] = useState(false);
   const [state, setState] = useState<ViewState>({ name: "idle" });
   const [sourceStates, setSourceStates] = useState<Record<string, SourceState>>({});
-  const [refundActionState, setRefundActionState] =
-    useState<RefundActionState | null>(null);
+  const [refundActionState, setRefundActionState] = useState<RefundActionState | null>(null);
 
   useEffect(
     () => () => {
@@ -114,11 +108,7 @@ export function TicketResolutionForm() {
     }
   }
 
-  async function loadCitationSource(
-    citation: Citation,
-    version: number,
-    signal: AbortSignal,
-  ) {
+  async function loadCitationSource(citation: Citation, version: number, signal: AbortSignal) {
     setSourceStates((current) => ({
       ...current,
       [citation.chunkId]: { name: "loading" },
@@ -176,9 +166,7 @@ export function TicketResolutionForm() {
     }
   }
 
-  function loadProposalSources(
-    proposal: ReplyResolutionProposal | RefundReviewResolutionProposal,
-  ) {
+  function loadProposalSources(proposal: ReplyResolutionProposal | RefundReviewResolutionProposal) {
     sourceRequestVersion.current += 1;
     const version = sourceRequestVersion.current;
     sourceAbortController.current?.abort();
@@ -200,11 +188,7 @@ export function TicketResolutionForm() {
   function retrySource(citation: Citation) {
     const controller = sourceAbortController.current ?? new AbortController();
     sourceAbortController.current = controller;
-    void loadCitationSource(
-      citation,
-      sourceRequestVersion.current,
-      controller.signal,
-    );
+    void loadCitationSource(citation, sourceRequestVersion.current, controller.signal);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -258,9 +242,7 @@ export function TicketResolutionForm() {
         if (result.data.data.action !== "needs_human_review") {
           loadProposalSources(result.data.data);
           setRefundActionState(
-            result.data.data.action === "request_refund_review"
-              ? { name: "pending" }
-              : null,
+            result.data.data.action === "request_refund_review" ? { name: "pending" } : null,
           );
         } else {
           sourceRequestVersion.current += 1;
@@ -275,14 +257,11 @@ export function TicketResolutionForm() {
     }
   }
 
-  async function confirmRefundReview(
-    proposal: RefundReviewResolutionProposal,
-  ) {
+  async function confirmRefundReview(proposal: RefundReviewResolutionProposal) {
     if (
       actionInFlight.current ||
       refundActionState?.name === "rejected" ||
-      (refundActionState?.name === "failure" &&
-        !refundActionState.retryable)
+      (refundActionState?.name === "failure" && !refundActionState.retryable)
     ) {
       return;
     }
@@ -320,9 +299,7 @@ export function TicketResolutionForm() {
           code: result.data.error.code,
           retryable: result.data.error.retryable,
         });
-      } else if (
-        result.data.data.proposalId !== proposal.actionProposal.proposalId
-      ) {
+      } else if (result.data.data.proposalId !== proposal.actionProposal.proposalId) {
         setRefundActionState({ name: "failure", retryable: false });
       } else {
         setRefundActionState({
@@ -353,13 +330,15 @@ export function TicketResolutionForm() {
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7a6552]">New analysis</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7a6552]">
+          New analysis
+        </p>
         <h2 className="mt-2 text-3xl font-semibold tracking-[-0.035em] text-[#17201d]">
           Resolve a support ticket
         </h2>
         <p className="mt-2 text-sm leading-6 text-[#65706c]">
-          Synthetic data only. Anthropic classifies and recommends; Voyage AI is used
-          only for knowledge retrieval embeddings.
+          Synthetic data only. Anthropic classifies and recommends; Voyage AI is used only for
+          knowledge retrieval embeddings.
         </p>
       </div>
 
@@ -392,7 +371,11 @@ export function TicketResolutionForm() {
           />
           <div className="mt-2 min-h-5">
             {touched && inputError ? (
-              <p id={`${textareaId}-error`} role="alert" className="text-xs font-medium text-[#a63b33]">
+              <p
+                id={`${textareaId}-error`}
+                role="alert"
+                className="text-xs font-medium text-[#a63b33]"
+              >
                 {inputError}
               </p>
             ) : (
@@ -422,7 +405,9 @@ export function TicketResolutionForm() {
         </div>
 
         <div className="mt-7 flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs leading-5 text-[#7a8580]">No reply or customer action will be sent.</p>
+          <p className="text-xs leading-5 text-[#7a8580]">
+            No reply or customer action will be sent.
+          </p>
           <button
             type="submit"
             disabled={!canSubmit}
@@ -469,7 +454,7 @@ export function TicketResolutionForm() {
             <p className="text-sm font-semibold text-[#8f312b]">Resolution not available</p>
             <p className="mt-1 text-sm leading-6 text-[#854d48]">
               {state.code
-                ? ERROR_MESSAGES[state.code] ?? ERROR_MESSAGES.internal_error
+                ? (ERROR_MESSAGES[state.code] ?? ERROR_MESSAGES.internal_error)
                 : "The response could not be verified. Check your connection and try again."}
             </p>
             {state.traceId && (
@@ -478,8 +463,7 @@ export function TicketResolutionForm() {
           </div>
         )}
 
-        {state.name === "success" &&
-          state.proposal.action === "needs_human_review" && (
+        {state.name === "success" && state.proposal.action === "needs_human_review" && (
           <section
             role="alert"
             className="overflow-hidden rounded-2xl border border-[#deb86e] bg-[#fffaf0] shadow-[0_14px_32px_rgba(87,64,28,0.08)]"
@@ -505,24 +489,20 @@ export function TicketResolutionForm() {
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#887047]">
                 Summary
               </p>
-              <p className="mt-2 text-[15px] leading-6 text-[#3e3423]">
-                {state.proposal.summary}
-              </p>
+              <p className="mt-2 text-[15px] leading-6 text-[#3e3423]">{state.proposal.summary}</p>
               <div className="mt-5 rounded-xl border border-[#e1c98f] bg-white px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#806021]">
                   Why review is needed
                 </p>
-                <p className="mt-2 text-sm leading-6 text-[#5c4a2b]">
-                  {state.proposal.reason}
-                </p>
+                <p className="mt-2 text-sm leading-6 text-[#5c4a2b]">{state.proposal.reason}</p>
               </div>
               <div className="mt-5 rounded-xl bg-[#5f4212] px-4 py-4 text-[#fff8e8]">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#f0d89e]">
                   Recommended next action
                 </p>
                 <p className="mt-2 text-sm leading-6">
-                  Review the ticket and supporting policy manually. No proposed reply or
-                  customer action was produced.
+                  Review the ticket and supporting policy manually. No proposed reply or customer
+                  action was produced.
                 </p>
               </div>
               <p className="mt-5 border-t border-[#eadfc8] pt-4 font-mono text-[11px] text-[#8b7958]">
@@ -532,8 +512,7 @@ export function TicketResolutionForm() {
           </section>
         )}
 
-        {state.name === "success" &&
-          state.proposal.action !== "needs_human_review" && (
+        {state.name === "success" && state.proposal.action !== "needs_human_review" && (
           <section className="overflow-hidden rounded-2xl border border-[#bfcfc9] bg-white shadow-[0_14px_32px_rgba(43,63,56,0.07)]">
             <div className="flex flex-col gap-3 border-b border-[#e1e5e1] bg-[#f0f6f3] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -555,15 +534,15 @@ export function TicketResolutionForm() {
               <ResultField label="Priority" value={state.proposal.priority} />
             </div>
             <div className="px-5 py-5 sm:px-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a8580]">Summary</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a8580]">
+                Summary
+              </p>
               <p className="mt-2 text-[15px] leading-6 text-[#26312d]">{state.proposal.summary}</p>
               <div className="mt-4 rounded-xl border border-[#e1e5e1] bg-[#f7f9f7] px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6f7d77]">
                   Why a draft is supported
                 </p>
-                <p className="mt-1.5 text-sm leading-6 text-[#5f6f69]">
-                  {state.proposal.reason}
-                </p>
+                <p className="mt-1.5 text-sm leading-6 text-[#5f6f69]">{state.proposal.reason}</p>
               </div>
               <div className="mt-6 rounded-2xl border border-[#d8ded9] bg-[#fafbf9] p-4 sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -624,7 +603,10 @@ export function TicketResolutionForm() {
                               </div>
                             </>
                           ) : sourceState?.name === "failure" ? (
-                            <div role="alert" className="rounded-lg bg-[#fff4f2] px-3 py-3 text-[#854d48]">
+                            <div
+                              role="alert"
+                              className="rounded-lg bg-[#fff4f2] px-3 py-3 text-[#854d48]"
+                            >
                               <p>The exact source could not be loaded.</p>
                               {sourceState.retryable && (
                                 <button
@@ -701,8 +683,8 @@ function RefundReviewControls({
         </span>
       </div>
       <p className="mt-3 text-sm leading-6 text-[#5c4a2b]">
-        Confirmation creates only a local audit result. It does not approve or
-        issue a refund, change a payment, or contact a customer.
+        Confirmation creates only a local audit result. It does not approve or issue a refund,
+        change a payment, or contact a customer.
       </p>
       <dl className="mt-4 space-y-3 rounded-lg border border-[#ead7ae] bg-white px-4 py-4 text-sm">
         <div>
@@ -715,9 +697,7 @@ function RefundReviewControls({
           <dt className="text-xs font-semibold uppercase tracking-[0.1em] text-[#887047]">
             Ticket summary
           </dt>
-          <dd className="mt-1 leading-6 text-[#3e3423]">
-            {arguments_.ticketSummary}
-          </dd>
+          <dd className="mt-1 leading-6 text-[#3e3423]">{arguments_.ticketSummary}</dd>
         </div>
         <div>
           <dt className="text-xs font-semibold uppercase tracking-[0.1em] text-[#887047]">
@@ -737,7 +717,10 @@ function RefundReviewControls({
       </p>
 
       {actionState.name === "executed" && (
-        <div role="status" className="mt-4 rounded-lg bg-[#e9f5ef] px-4 py-3 text-sm text-[#245343]">
+        <div
+          role="status"
+          className="mt-4 rounded-lg bg-[#e9f5ef] px-4 py-3 text-sm text-[#245343]"
+        >
           <p className="font-semibold">Local mock review recorded</p>
           <p className="mt-1 leading-6">{actionState.result.message}</p>
           <p className="mt-2 font-mono text-[11px]">
@@ -746,9 +729,12 @@ function RefundReviewControls({
         </div>
       )}
       {actionState.name === "rejected" && (
-        <div role="status" className="mt-4 rounded-lg bg-[#f2f1ec] px-4 py-3 text-sm text-[#53605b]">
-          Proposal rejected locally. No confirmation request was sent and no mock
-          action was executed.
+        <div
+          role="status"
+          className="mt-4 rounded-lg bg-[#f2f1ec] px-4 py-3 text-sm text-[#53605b]"
+        >
+          Proposal rejected locally. No confirmation request was sent and no mock action was
+          executed.
         </div>
       )}
       {actionState.name === "failure" && (
@@ -756,13 +742,11 @@ function RefundReviewControls({
           <p className="font-semibold">Mock action not recorded</p>
           <p className="mt-1 leading-6">
             {actionState.code
-              ? ERROR_MESSAGES[actionState.code] ?? ERROR_MESSAGES.internal_error
+              ? (ERROR_MESSAGES[actionState.code] ?? ERROR_MESSAGES.internal_error)
               : "The confirmation response could not be verified."}
           </p>
           {actionState.traceId && (
-            <p className="mt-2 font-mono text-[11px]">
-              Trace {actionState.traceId}
-            </p>
+            <p className="mt-2 font-mono text-[11px]">Trace {actionState.traceId}</p>
           )}
         </div>
       )}

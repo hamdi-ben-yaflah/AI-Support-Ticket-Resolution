@@ -24,6 +24,4 @@ export const ParsedKnowledgeDocumentSchema = z.object({
 });
 
 export type ParsedChunk = z.infer<typeof ParsedChunkSchema>;
-export type ParsedKnowledgeDocument = z.infer<
-  typeof ParsedKnowledgeDocumentSchema
->;
+export type ParsedKnowledgeDocument = z.infer<typeof ParsedKnowledgeDocumentSchema>;

@@ -41,14 +41,16 @@ function runInput(traceId: string, chunkId: string) {
       confidence: 0.9,
     },
     action: { type: "reply" as const, reason: "The evidence supports a reply." },
-    citedSources: [{
-      citationPosition: 0,
-      chunkId,
-      sourceId,
-      title: "Original title",
-      section: "Original section",
-      content: "Original exact cited content.",
-    }],
+    citedSources: [
+      {
+        citationPosition: 0,
+        chunkId,
+        sourceId,
+        title: "Original title",
+        section: "Original section",
+        content: "Original exact cited content.",
+      },
+    ],
     metadata: {
       promptVersions: { classification: "classify.v1", resolution: "resolve.v4" },
       resolutionPolicy: { version: "resolution-policy.v1" as const, minimumConfidence: 0.65 },
@@ -71,25 +73,21 @@ describe("PostgreSQL resolution source repository", () => {
       import("drizzle-orm/node-postgres/migrator"),
     ]);
     await migrate(getDatabase(), { migrationsFolder: "drizzle" });
-    const [{ deleteResolutionRunsByTraceIds }, { deleteDocumentsBySourceIds }] =
-      await Promise.all([
-        import("@/db/resolution-runs"),
-        import("@/db/knowledge"),
-      ]);
+    const [{ deleteResolutionRunsByTraceIds }, { deleteDocumentsBySourceIds }] = await Promise.all([
+      import("@/db/resolution-runs"),
+      import("@/db/knowledge"),
+    ]);
     await deleteResolutionRunsByTraceIds(traceIds);
     await deleteDocumentsBySourceIds([sourceId]);
   });
 
   afterAll(async () => {
-    const [
-      { deleteResolutionRunsByTraceIds },
-      { deleteDocumentsBySourceIds },
-      { closeDatabase },
-    ] = await Promise.all([
-      import("@/db/resolution-runs"),
-      import("@/db/knowledge"),
-      import("@/db/client"),
-    ]);
+    const [{ deleteResolutionRunsByTraceIds }, { deleteDocumentsBySourceIds }, { closeDatabase }] =
+      await Promise.all([
+        import("@/db/resolution-runs"),
+        import("@/db/knowledge"),
+        import("@/db/client"),
+      ]);
     await deleteResolutionRunsByTraceIds(traceIds);
     await deleteDocumentsBySourceIds([sourceId]);
     await closeDatabase();
@@ -97,9 +95,7 @@ describe("PostgreSQL resolution source repository", () => {
 
   it("persists cited snapshots transactionally and enforces session ownership", async () => {
     const { replaceDocument, searchDocumentChunks } = await import("@/db/knowledge");
-    const { findOwnedSource, persistSuccessfulResolution } = await import(
-      "@/db/resolution-runs"
-    );
+    const { findOwnedSource, persistSuccessfulResolution } = await import("@/db/resolution-runs");
     const base = {
       sourceId,
       title: "Original title",
@@ -108,14 +104,16 @@ describe("PostgreSQL resolution source repository", () => {
     await replaceDocument({
       ...base,
       contentHash: "d".repeat(64),
-      chunks: [{
-        chunkIndex: 0,
-        section: "Original section",
-        content: "Original exact cited content.",
-        tokenCount: 4,
-        embedding: vector(),
-        metadata: { sourceId, category: "billing", version: "1" },
-      }],
+      chunks: [
+        {
+          chunkIndex: 0,
+          section: "Original section",
+          content: "Original exact cited content.",
+          tokenCount: 4,
+          embedding: vector(),
+          metadata: { sourceId, category: "billing", version: "1" },
+        },
+      ],
     });
     const rows = await searchDocumentChunks({
       embedding: vector(),
@@ -140,14 +138,16 @@ describe("PostgreSQL resolution source repository", () => {
       ...base,
       title: "Replacement title",
       contentHash: "e".repeat(64),
-      chunks: [{
-        chunkIndex: 0,
-        section: "Replacement section",
-        content: "Replacement current content.",
-        tokenCount: 3,
-        embedding: vector(),
-        metadata: { sourceId, category: "billing", version: "2" },
-      }],
+      chunks: [
+        {
+          chunkIndex: 0,
+          section: "Replacement section",
+          content: "Replacement current content.",
+          tokenCount: 3,
+          embedding: vector(),
+          metadata: { sourceId, category: "billing", version: "2" },
+        },
+      ],
     });
     await expect(findOwnedSource(ownerHash, chunk.chunkId)).resolves.toMatchObject({
       title: "Original title",
@@ -166,9 +166,7 @@ describe("PostgreSQL resolution source repository", () => {
     const { searchDocumentChunks } = await import("@/db/knowledge");
     const { getDatabase } = await import("@/db/client");
     const { resolutionRuns } = await import("@/db/schema");
-    const { findOwnedSource, persistSuccessfulResolution } = await import(
-      "@/db/resolution-runs"
-    );
+    const { findOwnedSource, persistSuccessfulResolution } = await import("@/db/resolution-runs");
     const rows = await searchDocumentChunks({
       embedding: vector(),
       category: "billing",
@@ -207,10 +205,8 @@ describe("PostgreSQL resolution source repository", () => {
     const { getDatabase } = await import("@/db/client");
     const { actionAudit } = await import("@/db/schema");
     const { confirmOwnedRefundReview } = await import("@/db/action-audit");
-    const {
-      deleteResolutionRunsByTraceIds,
-      persistSuccessfulResolution,
-    } = await import("@/db/resolution-runs");
+    const { deleteResolutionRunsByTraceIds, persistSuccessfulResolution } =
+      await import("@/db/resolution-runs");
     const rows = await searchDocumentChunks({
       embedding: vector(),
       category: "billing",
@@ -254,13 +250,17 @@ describe("PostgreSQL resolution source repository", () => {
       result: null,
     });
 
-    await expect(confirmOwnedRefundReview({
-      proposalId,
-      sessionHash: otherHash,
-      traceId: "66666666-6666-4666-8666-666666666666",
-    })).rejects.toEqual(expect.objectContaining({
-      code: "not_found",
-    }));
+    await expect(
+      confirmOwnedRefundReview({
+        proposalId,
+        sessionHash: otherHash,
+        traceId: "66666666-6666-4666-8666-666666666666",
+      }),
+    ).rejects.toEqual(
+      expect.objectContaining({
+        code: "not_found",
+      }),
+    );
 
     let executorCalls = 0;
     const executedAt = new Date("2026-09-12T10:00:00.000Z");
@@ -311,10 +311,7 @@ describe("PostgreSQL resolution source repository", () => {
 
     await deleteResolutionRunsByTraceIds([traceIds[3] as string]);
     await expect(
-      getDatabase()
-        .select()
-        .from(actionAudit)
-        .where(eq(actionAudit.proposalId, proposalId)),
+      getDatabase().select().from(actionAudit).where(eq(actionAudit.proposalId, proposalId)),
     ).resolves.toEqual([]);
   });
 
@@ -322,10 +319,8 @@ describe("PostgreSQL resolution source repository", () => {
     const { searchDocumentChunks } = await import("@/db/knowledge");
     const { getDatabase } = await import("@/db/client");
     const { actionAudit } = await import("@/db/schema");
-    const {
-      ActionAuditRepositoryError,
-      confirmOwnedRefundReview,
-    } = await import("@/db/action-audit");
+    const { ActionAuditRepositoryError, confirmOwnedRefundReview } =
+      await import("@/db/action-audit");
     const { persistSuccessfulResolution } = await import("@/db/resolution-runs");
     const rows = await searchDocumentChunks({
       embedding: vector(),
@@ -367,24 +362,26 @@ describe("PostgreSQL resolution source repository", () => {
       .where(eq(actionAudit.proposalId, proposalId));
 
     let executorCalls = 0;
-    await expect(confirmOwnedRefundReview(
-      {
-        proposalId,
-        sessionHash: ownerHash,
-        traceId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-      },
-      {
-        executor: (_arguments, context) => {
-          executorCalls += 1;
-          return {
-            proposalId: context.proposalId,
-            status: "mock_review_recorded",
-            message: "A local mock record was created. No refund was approved or issued.",
-            executedAt: context.executedAt.toISOString(),
-          };
+    await expect(
+      confirmOwnedRefundReview(
+        {
+          proposalId,
+          sessionHash: ownerHash,
+          traceId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         },
-      },
-    )).rejects.toBeInstanceOf(ActionAuditRepositoryError);
+        {
+          executor: (_arguments, context) => {
+            executorCalls += 1;
+            return {
+              proposalId: context.proposalId,
+              status: "mock_review_recorded",
+              message: "A local mock record was created. No refund was approved or issued.",
+              executedAt: context.executedAt.toISOString(),
+            };
+          },
+        },
+      ),
+    ).rejects.toBeInstanceOf(ActionAuditRepositoryError);
     expect(executorCalls).toBe(0);
     const [stored] = await getDatabase()
       .select({

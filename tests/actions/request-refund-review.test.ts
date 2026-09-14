@@ -26,16 +26,18 @@ describe("requestRefundReview mock", () => {
   });
 
   it("rejects invalid arguments before producing a result", () => {
-    expect(() => executeMockRefundReview(
-      {
-        reason: "short",
-        ticketSummary: "Summary",
-        evidenceChunkIds: ["223e4567-e89b-42d3-a456-426614174000"],
-      },
-      {
-        proposalId: "323e4567-e89b-42d3-a456-426614174000",
-        executedAt: new Date("2026-09-12T10:00:00.000Z"),
-      },
-    )).toThrow();
+    expect(() =>
+      executeMockRefundReview(
+        {
+          reason: "short",
+          ticketSummary: "Summary",
+          evidenceChunkIds: ["223e4567-e89b-42d3-a456-426614174000"],
+        },
+        {
+          proposalId: "323e4567-e89b-42d3-a456-426614174000",
+          executedAt: new Date("2026-09-12T10:00:00.000Z"),
+        },
+      ),
+    ).toThrow();
   });
 });

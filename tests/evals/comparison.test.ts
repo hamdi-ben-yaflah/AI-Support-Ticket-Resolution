@@ -4,10 +4,7 @@ import {
   PersistedEvaluationRunSchema,
   type PersistedEvaluationRun,
 } from "@/evals/comparison-contracts";
-import {
-  compareEvaluationRuns,
-  EvaluationComparisonError,
-} from "@/evals/comparison";
+import { compareEvaluationRuns, EvaluationComparisonError } from "@/evals/comparison";
 import type { EvaluationReport } from "@/evals/contracts";
 import { reportToPersistedRun } from "@/evals/persistence";
 import { makeEvaluationReport } from "../support/evaluation";

@@ -2,7 +2,7 @@
 
 **Status:** Draft 1.0  
 **Product type:** Portfolio-ready web application  
-**Primary implementation language:** TypeScript  
+**Primary implementation language:** TypeScript
 
 ## 1. Product summary
 
@@ -247,4 +247,3 @@ The MVP is complete when:
 - Multi-tenant document isolation.
 - Real help-desk integration in read-only mode.
 - Conversation history with explicit server-owned state.
-

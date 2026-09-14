@@ -6,7 +6,7 @@ Anthropic is the only text-generation provider. Voyage AI is used only for 1,024
 
 ## Prerequisites
 
-- Node.js 20 or newer
+- Node.js 24 LTS
 - pnpm 11
 - Podman with the `podman compose` provider (for local PostgreSQL/pgvector)
 - Anthropic and Voyage AI API keys for live resolution, ingestion, and evaluation
@@ -57,7 +57,7 @@ The deterministic quality metrics are schema validity, exact category, allowed p
 
 To estimate cost, set both `EVAL_ANTHROPIC_INPUT_USD_PER_MILLION` and `EVAL_ANTHROPIC_OUTPUT_USD_PER_MILLION` to reviewed prices for the configured model. If either is absent, cost is `null`; the application never guesses current provider pricing.
 
-With `pnpm dev` running, open [http://localhost:3000/admin/evaluations](http://localhost:3000/admin/evaluations). This route is intentionally unauthenticated and local-only. Starting a run makes costly live provider calls, the API allows only one in-process browser run at a time, and the synchronous request may exceed managed-hosting duration limits. Do not publicly deploy this admin surface as-is. The complete downloadable report exists only in tab memory, while an allowlisted aggregate and compact per-case representation persists in local PostgreSQL across refreshes and server restarts.
+With `pnpm dev` running and `ENABLE_LIVE_EVALUATIONS=true`, open [http://localhost:3000/admin/evaluations](http://localhost:3000/admin/evaluations). This route is intentionally unauthenticated and local-only. Starting a run makes costly live provider calls, the API allows only one in-process browser run at a time, and the synchronous request may exceed managed-hosting duration limits. Production disables this page and every `/api/evaluations/**` route by default; disabled surfaces return a non-revealing 404. The complete downloadable report exists only in tab memory, while an allowlisted aggregate and compact per-case representation persists in local PostgreSQL across refreshes and server restarts.
 
 The page lists the 20 most recent runs and compares an explicit baseline with a candidate only when report schema, dataset version/hash, and exact case-ID set match. Quality and operational deltas are always `candidate - baseline`; missing metrics and unconfigured cost remain `null`. Model and classification/resolution/citation-judge prompt versions are shown separately. Retrieval, resolution-policy, threshold, pricing, provider, and concurrency changes are displayed as confounders rather than hidden or used to declare a universal winner. History is bounded to 50 records per API request and this local MVP has no retention or deletion controls.
 
@@ -76,11 +76,17 @@ Three representative failure analyses:
 ## Commands
 
 ```bash
+pnpm format
+pnpm format:check
 pnpm lint
-pnpm exec tsc --noEmit
+pnpm typecheck
 pnpm test
+pnpm test:coverage
 pnpm build
+pnpm build:operations
+pnpm ci
 pnpm db:generate
+pnpm db:check
 pnpm db:migrate
 pnpm ingest
 pnpm chunks:inspect
@@ -89,6 +95,16 @@ pnpm test:integration
 ```
 
 Unit tests are deterministic and make no provider calls. Integration tests require an explicitly isolated PostgreSQL database whose name ends in `_test`, supplied as `TEST_DATABASE_URL`; they run the committed migration and use fixed fake vectors.
+
+## CI/CD and Dokploy
+
+Pull requests run deterministic formatting, lint, type, migration-consistency, unit/coverage, PostgreSQL integration, production build, container smoke, dependency, vulnerability, and CodeQL checks without provider secrets. Merges to `main` publish the exact verified `linux/amd64` image to GHCR under immutable commit-SHA and moving `main` tags, then deploy through a protected GitHub `production` environment. Deployment succeeds only when public liveness reports the expected SHA, PostgreSQL readiness passes, the home page responds, and production evaluation surfaces remain unavailable.
+
+The production container runs as a non-root user. Before starting Next.js it applies committed Drizzle migrations and idempotently ingests the synthetic Markdown knowledge base; failure keeps the replacement unhealthy so Dokploy can preserve or roll back to the previous task. Schema changes must use forward-compatible expand/contract migrations because application rollback never reverses database migrations.
+
+Live Anthropic/Voyage evaluation runs only from the manual/weekly **Live AI evaluation** workflow against a disposable pgvector database and uploads the existing redacted report. It is not a pull-request or production release gate.
+
+Follow [docs/operations/first-production-deploy.md](docs/operations/first-production-deploy.md) when you are ready to configure and trigger the first deployment. See [docs/operations/dokploy-deployment.md](docs/operations/dokploy-deployment.md) for the deeper backup/restore, hardening, diagnosis, credential-rotation, retention, and rollback procedures.
 
 ## Architecture
 

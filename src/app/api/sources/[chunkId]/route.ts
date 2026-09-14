@@ -52,10 +52,7 @@ export function createSourceHandler(dependencies: HandlerDependencies = {}) {
   const createTraceId = dependencies.createTraceId ?? randomUUID;
   const log = dependencies.log ?? logger;
 
-  return async function GET(
-    request: Request,
-    context: SourceRouteContext,
-  ): Promise<Response> {
+  return async function GET(request: Request, context: SourceRouteContext): Promise<Response> {
     const traceId = createTraceId();
     const parsedChunkId = ChunkIdSchema.safeParse((await context.params).chunkId);
     if (!parsedChunkId.success) {

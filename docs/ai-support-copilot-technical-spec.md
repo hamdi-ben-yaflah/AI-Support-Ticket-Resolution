@@ -2,7 +2,7 @@
 
 **Status:** Draft 1.0  
 **Related document:** `ai-support-copilot-prd.md`  
-**Runtime:** Node.js with TypeScript  
+**Runtime:** Node.js with TypeScript
 
 ## 1. Technical objective
 
@@ -10,19 +10,19 @@ Implement a portfolio-sized AI support workflow that converts a ticket into a va
 
 ## 2. Recommended stack
 
-| Area | Choice | Rationale |
-| --- | --- | --- |
-| Web application | Next.js with App Router | One TypeScript codebase for UI and server routes |
-| Language | TypeScript in strict mode | Strong contracts across AI boundaries |
-| Validation | Zod | Runtime validation plus inferred TypeScript types |
-| Database | PostgreSQL | Durable relational state and audit records |
-| Vector search | pgvector | Keeps MVP relational and vector data together |
-| ORM | Drizzle ORM | Typed schema and explicit SQL-friendly behavior |
-| LLM provider | Anthropic adapter | Anthropic remains the only text-generation provider for this story |
-| Embeddings | Voyage AI embedding adapter | Separate capability from text generation; use document/query input types for retrieval |
-| Testing | Vitest | Unit and integration tests in TypeScript |
-| Logging | Pino-compatible structured logger | JSON telemetry with redaction |
-| Local environment | Podman Compose | Reproducible PostgreSQL and pgvector setup |
+| Area              | Choice                            | Rationale                                                                              |
+| ----------------- | --------------------------------- | -------------------------------------------------------------------------------------- |
+| Web application   | Next.js with App Router           | One TypeScript codebase for UI and server routes                                       |
+| Language          | TypeScript in strict mode         | Strong contracts across AI boundaries                                                  |
+| Validation        | Zod                               | Runtime validation plus inferred TypeScript types                                      |
+| Database          | PostgreSQL                        | Durable relational state and audit records                                             |
+| Vector search     | pgvector                          | Keeps MVP relational and vector data together                                          |
+| ORM               | Drizzle ORM                       | Typed schema and explicit SQL-friendly behavior                                        |
+| LLM provider      | Anthropic adapter                 | Anthropic remains the only text-generation provider for this story                     |
+| Embeddings        | Voyage AI embedding adapter       | Separate capability from text generation; use document/query input types for retrieval |
+| Testing           | Vitest                            | Unit and integration tests in TypeScript                                               |
+| Logging           | Pino-compatible structured logger | JSON telemetry with redaction                                                          |
+| Local environment | Podman Compose                    | Reproducible PostgreSQL and pgvector setup                                             |
 
 The provider and concrete model names are configuration, not domain constants.
 
@@ -101,7 +101,7 @@ import { z } from "zod";
 
 export const TicketInputSchema = z.object({
   text: z.string().trim().min(10).max(10_000),
-  customerTier: z.enum(["standard", "premium"]).optional()
+  customerTier: z.enum(["standard", "premium"]).optional(),
 });
 
 export type TicketInput = z.infer<typeof TicketInputSchema>;
@@ -114,7 +114,7 @@ export const ClassificationSchema = z.object({
   category: z.enum(["billing", "technical", "account", "other"]),
   priority: z.enum(["low", "medium", "high"]),
   summary: z.string().min(1).max(300),
-  confidence: z.number().min(0).max(1)
+  confidence: z.number().min(0).max(1),
 });
 ```
 
@@ -127,7 +127,7 @@ export const CitationSchema = z.object({
   chunkId: z.string().uuid(),
   sourceId: z.string().min(1),
   section: z.string().min(1),
-  claim: z.string().min(1)
+  claim: z.string().min(1),
 });
 
 export const ResolutionSchema = z.object({
@@ -137,13 +137,8 @@ export const ResolutionSchema = z.object({
   suggestedResponse: z.string().min(1).max(4_000),
   citations: z.array(CitationSchema).max(8),
   confidence: z.number().min(0).max(1),
-  action: z.enum([
-    "reply",
-    "request_refund_review",
-    "escalate",
-    "needs_human_review"
-  ]),
-  reason: z.string().min(1).max(500)
+  action: z.enum(["reply", "request_refund_review", "escalate", "needs_human_review"]),
+  reason: z.string().min(1).max(500),
 });
 ```
 
@@ -220,27 +215,27 @@ Do not silently retry schema-invalid output with a changed prompt. Such behavior
 
 ### `documents`
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | UUID | Primary key |
-| `source_id` | Text | Stable repository identifier |
-| `title` | Text | Display title |
-| `content_hash` | Text | Detect unchanged documents |
-| `metadata` | JSONB | Category and version metadata |
-| `created_at` | Timestamp | Audit field |
+| Column         | Type      | Notes                         |
+| -------------- | --------- | ----------------------------- |
+| `id`           | UUID      | Primary key                   |
+| `source_id`    | Text      | Stable repository identifier  |
+| `title`        | Text      | Display title                 |
+| `content_hash` | Text      | Detect unchanged documents    |
+| `metadata`     | JSONB     | Category and version metadata |
+| `created_at`   | Timestamp | Audit field                   |
 
 ### `document_chunks`
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | UUID | Citation identifier |
-| `document_id` | UUID | Foreign key |
+| Column        | Type    | Notes                                   |
+| ------------- | ------- | --------------------------------------- |
+| `id`          | UUID    | Citation identifier                     |
+| `document_id` | UUID    | Foreign key                             |
 | `chunk_index` | Integer | Stable ordering within document version |
-| `section` | Text | Markdown heading path |
-| `content` | Text | Embedded and retrieved text |
-| `token_count` | Integer | Approximate chunk size |
-| `embedding` | Vector | Dimension matches embedding provider |
-| `metadata` | JSONB | Category and custom filters |
+| `section`     | Text    | Markdown heading path                   |
+| `content`     | Text    | Embedded and retrieved text             |
+| `token_count` | Integer | Approximate chunk size                  |
+| `embedding`   | Vector  | Dimension matches embedding provider    |
+| `metadata`    | JSONB   | Category and custom filters             |
 
 ### `resolution_runs`
 
@@ -303,7 +298,7 @@ const retrievalConfig = {
   candidateCount: 8,
   finalCount: 5,
   minimumSimilarity: 0.65,
-  maximumContextTokens: 3_500
+  maximumContextTokens: 3_500,
 };
 ```
 
@@ -398,7 +393,7 @@ Tool definition:
 export const RequestRefundReviewArgsSchema = z.object({
   reason: z.string().min(10).max(500),
   ticketSummary: z.string().min(1).max(300),
-  evidenceChunkIds: z.array(z.string().uuid()).min(1).max(5)
+  evidenceChunkIds: z.array(z.string().uuid()).min(1).max(5),
 });
 ```
 
@@ -442,17 +437,17 @@ Returns display-safe source metadata and content only when the chunk belongs to 
 
 ## 14. Error and retry policy
 
-| Failure | Retry? | Behavior |
-| --- | --- | --- |
-| Rate limit | Yes | Exponential backoff with jitter; honor retry headers |
-| Provider 5xx | Yes | Maximum two retries within request deadline |
-| Network interruption | Yes | Retry only when request semantics are safe |
-| Timeout | Limited | One retry if sufficient deadline remains |
-| Invalid request | No | Fix application configuration |
-| Schema-invalid output | No by default | Record failure and return controlled error |
-| Safety refusal | No | Return human-review state |
-| Retrieval unavailable | No model fallback | Return retryable service error |
-| Insufficient evidence | No | Return successful abstention |
+| Failure               | Retry?            | Behavior                                             |
+| --------------------- | ----------------- | ---------------------------------------------------- |
+| Rate limit            | Yes               | Exponential backoff with jitter; honor retry headers |
+| Provider 5xx          | Yes               | Maximum two retries within request deadline          |
+| Network interruption  | Yes               | Retry only when request semantics are safe           |
+| Timeout               | Limited           | One retry if sufficient deadline remains             |
+| Invalid request       | No                | Fix application configuration                        |
+| Schema-invalid output | No by default     | Record failure and return controlled error           |
+| Safety refusal        | No                | Return human-review state                            |
+| Retrieval unavailable | No model fallback | Return retryable service error                       |
+| Insufficient evidence | No                | Return successful abstention                         |
 
 All calls use an overall deadline. Retries must not multiply beyond that deadline.
 
@@ -538,7 +533,7 @@ export const thresholds = {
   categoryAccuracy: 0.9,
   retrievalRecallAt5: 0.9,
   citationSupport: 0.85,
-  abstentionAccuracy: 0.85
+  abstentionAccuracy: 0.85,
 };
 ```
 

@@ -16,8 +16,5 @@ export interface EmbeddingProvider {
   readonly name: string;
   readonly model: string;
   readonly dimensions: number;
-  embed(
-    texts: readonly string[],
-    metadata: EmbeddingRequestMetadata,
-  ): Promise<EmbeddingResult>;
+  embed(texts: readonly string[], metadata: EmbeddingRequestMetadata): Promise<EmbeddingResult>;
 }

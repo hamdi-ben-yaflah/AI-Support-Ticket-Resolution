@@ -4,15 +4,8 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
-import {
-  actionAudit,
-  resolutionRuns,
-  resolutionRunSources,
-} from "@/db/schema";
-import {
-  PersistedResolutionRunSchema,
-  type PersistedResolutionRun,
-} from "@/domain/resolution-run";
+import { actionAudit, resolutionRuns, resolutionRunSources } from "@/db/schema";
+import { PersistedResolutionRunSchema, type PersistedResolutionRun } from "@/domain/resolution-run";
 import { SourceDetailSchema, type SourceDetail } from "@/domain/source";
 
 const OwnedSourceLookupSchema = z
@@ -22,9 +15,7 @@ const OwnedSourceLookupSchema = z
   })
   .strict();
 
-export async function persistSuccessfulResolution(
-  raw: PersistedResolutionRun,
-): Promise<void> {
+export async function persistSuccessfulResolution(raw: PersistedResolutionRun): Promise<void> {
   const input = PersistedResolutionRunSchema.parse(raw);
 
   await getDatabase().transaction(async (transaction) => {
@@ -65,13 +56,9 @@ export async function persistSuccessfulResolution(
     }
 
     if (input.action.type === "request_refund_review") {
-      const citedIds = new Set(
-        input.citedSources.map((source) => source.chunkId),
-      );
+      const citedIds = new Set(input.citedSources.map((source) => source.chunkId));
       if (
-        input.action.proposal.arguments.evidenceChunkIds.some(
-          (chunkId) => !citedIds.has(chunkId),
-        )
+        input.action.proposal.arguments.evidenceChunkIds.some((chunkId) => !citedIds.has(chunkId))
       ) {
         throw new Error("Action evidence does not belong to the resolution run.");
       }
@@ -100,10 +87,7 @@ export async function findOwnedSource(
       content: resolutionRunSources.content,
     })
     .from(resolutionRunSources)
-    .innerJoin(
-      resolutionRuns,
-      eq(resolutionRunSources.resolutionRunId, resolutionRuns.id),
-    )
+    .innerJoin(resolutionRuns, eq(resolutionRunSources.resolutionRunId, resolutionRuns.id))
     .where(
       and(
         eq(resolutionRuns.sessionHash, lookup.sessionHash),
@@ -117,9 +101,7 @@ export async function findOwnedSource(
   return row ? SourceDetailSchema.parse(row) : undefined;
 }
 
-export async function deleteResolutionRunsByTraceIds(
-  traceIds: readonly string[],
-): Promise<void> {
+export async function deleteResolutionRunsByTraceIds(traceIds: readonly string[]): Promise<void> {
   if (traceIds.length === 0) return;
   await getDatabase()
     .delete(resolutionRuns)

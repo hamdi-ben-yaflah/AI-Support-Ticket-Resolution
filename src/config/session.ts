@@ -22,9 +22,7 @@ export class SessionConfigurationError extends Error {
   }
 }
 
-export function getSessionConfig(
-  environment: NodeJS.ProcessEnv = process.env,
-): SessionConfig {
+export function getSessionConfig(environment: NodeJS.ProcessEnv = process.env): SessionConfig {
   const parsed = SessionConfigSchema.safeParse(environment);
   if (!parsed.success) throw new SessionConfigurationError();
 

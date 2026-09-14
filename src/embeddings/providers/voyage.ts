@@ -1,10 +1,6 @@
 import "server-only";
 
-import {
-  VoyageAIClient,
-  VoyageAIError,
-  VoyageAITimeoutError,
-} from "voyageai";
+import { VoyageAIClient, VoyageAIError, VoyageAITimeoutError } from "voyageai";
 import { z } from "zod";
 
 import { EmbeddingError } from "@/embeddings/errors";
@@ -69,15 +65,13 @@ function mapVoyageError(error: unknown, retryCount: number): EmbeddingError {
 
   if (
     error instanceof VoyageAIError &&
-    (error.statusCode === undefined ||
-      error.statusCode === 429 ||
-      error.statusCode >= 500)
+    (error.statusCode === undefined || error.statusCode === 429 || error.statusCode >= 500)
   ) {
-    return new EmbeddingError(
-      "unavailable",
-      "The embedding provider is temporarily unavailable.",
-      { retryable: true, retryCount, cause: error },
-    );
+    return new EmbeddingError("unavailable", "The embedding provider is temporarily unavailable.", {
+      retryable: true,
+      retryCount,
+      cause: error,
+    });
   }
 
   if (
@@ -257,8 +251,7 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
           retryCount,
         };
       } catch (error) {
-        const mapped =
-          error instanceof EmbeddingError ? error : mapVoyageError(error, retryCount);
+        const mapped = error instanceof EmbeddingError ? error : mapVoyageError(error, retryCount);
         if (!mapped.retryable || retryCount >= this.maxRetries) {
           this.log.error({
             event: "embedding_call",

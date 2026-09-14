@@ -1,9 +1,5 @@
 export type EmbeddingErrorCode =
-  | "timeout"
-  | "unavailable"
-  | "configuration"
-  | "invalid_output"
-  | "unexpected";
+  "timeout" | "unavailable" | "configuration" | "invalid_output" | "unexpected";
 
 export class EmbeddingError extends Error {
   readonly code: EmbeddingErrorCode;

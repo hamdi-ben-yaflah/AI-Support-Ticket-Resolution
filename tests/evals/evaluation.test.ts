@@ -7,11 +7,7 @@ import { LlmError } from "@/ai/errors";
 import type { LlmProvider } from "@/ai/types";
 import { parseEvaluationCliArguments } from "@/evals/cli-options";
 import { parseGoldenDataset } from "@/evals/dataset";
-import {
-  aggregateQualityMetrics,
-  gradeExecution,
-  nearestRankPercentile,
-} from "@/evals/graders";
+import { aggregateQualityMetrics, gradeExecution, nearestRankPercentile } from "@/evals/graders";
 import { judgeCitations } from "@/evals/judge";
 import { runEvaluation } from "@/evals/runner";
 import {
@@ -34,21 +30,29 @@ describe("golden evaluation dataset", () => {
       new Set(["billing", "technical", "account", "other"]),
     );
     expect(dataset.cases.some((item) => item.tags.includes("prompt-injection"))).toBe(true);
-    expect(dataset.cases.some((item) =>
-      item.expected.actions.includes("request_refund_review") &&
-      item.tags.includes("action-ready")
-    )).toBe(true);
-    expect(dataset.cases.some((item) =>
-      item.expected.actions.includes("request_refund_review") &&
-      item.tags.includes("confirmation-bypass")
-    )).toBe(true);
+    expect(
+      dataset.cases.some(
+        (item) =>
+          item.expected.actions.includes("request_refund_review") &&
+          item.tags.includes("action-ready"),
+      ),
+    ).toBe(true);
+    expect(
+      dataset.cases.some(
+        (item) =>
+          item.expected.actions.includes("request_refund_review") &&
+          item.tags.includes("confirmation-bypass"),
+      ),
+    ).toBe(true);
     expect(dataset.cases.some((item) => item.expected.shouldAbstain)).toBe(true);
   });
 
   it("rejects blank lines, duplicates, mixed versions, and undersized datasets", () => {
     const item = JSON.stringify(makeGoldenCases(1)[0]);
     expect(() => parseGoldenDataset(`${item}\n\n${item}`)).toThrow("blank line");
-    expect(() => parseGoldenDataset(Array.from({ length: 30 }, () => item).join("\n"))).toThrow("Duplicate");
+    expect(() => parseGoldenDataset(Array.from({ length: 30 }, () => item).join("\n"))).toThrow(
+      "Duplicate",
+    );
     expect(() => parseGoldenDataset(item.replace("golden.v2", "golden.v1"))).toThrow();
     expect(() => parseGoldenDataset(item)).toThrow();
   });
@@ -69,9 +73,15 @@ describe("evaluation CLI options", () => {
       ),
     ).toEqual({ concurrency: 3, output: "/workspace/artifacts/report.json" });
     expect(() => parseEvaluationCliArguments(["--wat"], "/workspace")).toThrow("Unknown");
-    expect(() => parseEvaluationCliArguments(["--concurrency", "0"], "/workspace")).toThrow("1 to 5");
-    expect(() => parseEvaluationCliArguments(["--output", "result.txt"], "/workspace")).toThrow("JSON");
-    expect(() => parseEvaluationCliArguments(["--output", "a.json", "--output", "b.json"], "/workspace")).toThrow("Duplicate");
+    expect(() => parseEvaluationCliArguments(["--concurrency", "0"], "/workspace")).toThrow(
+      "1 to 5",
+    );
+    expect(() => parseEvaluationCliArguments(["--output", "result.txt"], "/workspace")).toThrow(
+      "JSON",
+    );
+    expect(() =>
+      parseEvaluationCliArguments(["--output", "a.json", "--output", "b.json"], "/workspace"),
+    ).toThrow("Duplicate");
   });
 });
 
@@ -105,7 +115,14 @@ describe("evaluation graders", () => {
         citationSupport: 0.5,
       },
       judgeDecisions: [],
-      telemetry: { latencyMs: 1, generationInputTokens: 1, generationOutputTokens: 1, judgeInputTokens: 1, judgeOutputTokens: 1, retryCount: 0 },
+      telemetry: {
+        latencyMs: 1,
+        generationInputTokens: 1,
+        generationOutputTokens: 1,
+        judgeInputTokens: 1,
+        judgeOutputTokens: 1,
+        retryCount: 0,
+      },
       error: null,
       passed: false,
     };
@@ -123,7 +140,15 @@ describe("citation judge", () => {
       name: "fake",
       model: "fake",
       generateStructured: vi.fn().mockResolvedValue({
-        value: { decisions: [{ citationId: "323e4567-e89b-42d3-a456-426614174000", supported: true, rationale: "Wrong ID." }] },
+        value: {
+          decisions: [
+            {
+              citationId: "323e4567-e89b-42d3-a456-426614174000",
+              supported: true,
+              rationale: "Wrong ID.",
+            },
+          ],
+        },
         model: "fake",
         finishReason: "end_turn",
         usage: { inputTokens: 1, outputTokens: 1 },
@@ -131,8 +156,9 @@ describe("citation judge", () => {
         retryCount: 0,
       }),
     } as unknown as LlmProvider;
-    await expect(judgeCitations({ execution: makeExecution(), provider, traceId: evaluationTraceId }))
-      .rejects.toMatchObject({ code: "invalid_output" });
+    await expect(
+      judgeCitations({ execution: makeExecution(), provider, traceId: evaluationTraceId }),
+    ).rejects.toMatchObject({ code: "invalid_output" });
   });
 
   it("judges and grades refund-review citations without exposing action arguments", async () => {
@@ -142,11 +168,13 @@ describe("citation judge", () => {
       model: "fake",
       generateStructured: vi.fn().mockResolvedValue({
         value: {
-          decisions: [{
-            citationId: evaluationChunkId,
-            supported: true,
-            rationale: "Direct support.",
-          }],
+          decisions: [
+            {
+              citationId: evaluationChunkId,
+              supported: true,
+              rationale: "Direct support.",
+            },
+          ],
         },
         model: "fake",
         finishReason: "end_turn",
@@ -176,10 +204,12 @@ describe("citation judge", () => {
       citationSupport: 1,
       abstentionCorrect: true,
     });
-    expect(JSON.stringify({
-      action: execution.proposal.action,
-      citedChunkIds: execution.citedSources.map((source) => source.chunkId),
-    })).not.toContain("proposalId");
+    expect(
+      JSON.stringify({
+        action: execution.proposal.action,
+        citedChunkIds: execution.citedSources.map((source) => source.chunkId),
+      }),
+    ).not.toContain("proposalId");
   });
 });
 
@@ -196,7 +226,14 @@ describe("shared evaluation runner", () => {
         provider: "fake",
         model: "fake-model",
         promptVersions: { classification: "classify.v1", resolution: "resolve.v4" },
-        retrieval: { version: "retrieval.v1", candidateCount: 8, finalCount: 5, minimumSimilarity: 0.65, maximumContextTokens: 3_500, minimumEvidenceCount: 1 },
+        retrieval: {
+          version: "retrieval.v1",
+          candidateCount: 8,
+          finalCount: 5,
+          minimumSimilarity: 0.65,
+          maximumContextTokens: 3_500,
+          minimumEvidenceCount: 1,
+        },
         resolutionPolicy: { version: "resolution-policy.v1", minimumConfidence: 0.65 },
         pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 2 },
       },
@@ -210,7 +247,11 @@ describe("shared evaluation runner", () => {
           return makeExecution();
         },
         judge: async () => ({
-          value: { decisions: [{ citationId: evaluationChunkId, supported: true, rationale: "Direct support." }] },
+          value: {
+            decisions: [
+              { citationId: evaluationChunkId, supported: true, rationale: "Direct support." },
+            ],
+          },
           model: "fake-model",
           finishReason: "end_turn",
           usage: { inputTokens: 5, outputTokens: 3 },
@@ -235,15 +276,24 @@ describe("shared evaluation runner", () => {
       dataset: { version: "golden.v2", sha256: "c".repeat(64), cases },
       concurrency: 2,
       runtime: {
-        provider: "fake", model: "fake-model",
+        provider: "fake",
+        model: "fake-model",
         promptVersions: { classification: "classify.v1", resolution: "resolve.v4" },
-        retrieval: { version: "retrieval.v1", candidateCount: 8, finalCount: 5, minimumSimilarity: 0.65, maximumContextTokens: 3_500, minimumEvidenceCount: 1 },
+        retrieval: {
+          version: "retrieval.v1",
+          candidateCount: 8,
+          finalCount: 5,
+          minimumSimilarity: 0.65,
+          maximumContextTokens: 3_500,
+          minimumEvidenceCount: 1,
+        },
         resolutionPolicy: { version: "resolution-policy.v1", minimumConfidence: 0.65 },
         pricing: null,
       },
       dependencies: {
         execute: async (item, context) => {
-          if (item.id === cases[0]!.id) throw new LlmError("timeout", "secret", { retryable: true });
+          if (item.id === cases[0]!.id)
+            throw new LlmError("timeout", "secret", { retryable: true });
           context.recordRetrieved(makeEvidence());
           return makeExecution();
         },
@@ -251,12 +301,21 @@ describe("shared evaluation runner", () => {
           if (traceId === "323e4567-e89b-42d3-a456-426614174000") {
             throw new LlmError("invalid_output", "secret", { retryable: false });
           }
-          return { value: { decisions: [{ citationId: evaluationChunkId, supported: true, rationale: "Direct." }] }, model: "fake", finishReason: "end_turn", usage: { inputTokens: 1, outputTokens: 1 }, latencyMs: 1, retryCount: 0 };
+          return {
+            value: {
+              decisions: [{ citationId: evaluationChunkId, supported: true, rationale: "Direct." }],
+            },
+            model: "fake",
+            finishReason: "end_turn",
+            usage: { inputTokens: 1, outputTokens: 1 },
+            latencyMs: 1,
+            retryCount: 0,
+          };
         },
       },
       createId: (() => {
         let count = 0;
-        return () => count++ === 1 ? "323e4567-e89b-42d3-a456-426614174000" : evaluationTraceId;
+        return () => (count++ === 1 ? "323e4567-e89b-42d3-a456-426614174000" : evaluationTraceId);
       })(),
     });
     expect(report.cases).toHaveLength(30);

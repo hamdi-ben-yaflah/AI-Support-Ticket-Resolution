@@ -8,10 +8,7 @@ import {
 } from "@/evals/comparison-contracts";
 
 export type EvaluationComparisonErrorCode =
-  | "same_run"
-  | "incompatible_schema"
-  | "incompatible_dataset"
-  | "incompatible_cases";
+  "same_run" | "incompatible_schema" | "incompatible_dataset" | "incompatible_cases";
 
 export class EvaluationComparisonError extends Error {
   constructor(readonly code: EvaluationComparisonErrorCode) {
@@ -24,7 +21,10 @@ function stable(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
   const record = value as Record<string, unknown>;
-  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stable(record[key])}`).join(",")}}`;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stable(record[key])}`)
+    .join(",")}}`;
 }
 
 function display(value: unknown): string {
@@ -122,15 +122,45 @@ export function compareEvaluationRuns(
   const versionDifferences = compact([
     difference("model", "Generation model", baseline.runtime.model, candidate.runtime.model),
     difference("judgeModel", "Citation judge model", baseline.judgeModel, candidate.judgeModel),
-    difference("prompt.classification", "Classification prompt", baseline.runtime.promptVersions.classification, candidate.runtime.promptVersions.classification),
-    difference("prompt.resolution", "Resolution prompt", baseline.runtime.promptVersions.resolution, candidate.runtime.promptVersions.resolution),
-    difference("prompt.citationJudge", "Citation judge prompt", baseline.runtime.promptVersions.citationJudge, candidate.runtime.promptVersions.citationJudge),
+    difference(
+      "prompt.classification",
+      "Classification prompt",
+      baseline.runtime.promptVersions.classification,
+      candidate.runtime.promptVersions.classification,
+    ),
+    difference(
+      "prompt.resolution",
+      "Resolution prompt",
+      baseline.runtime.promptVersions.resolution,
+      candidate.runtime.promptVersions.resolution,
+    ),
+    difference(
+      "prompt.citationJudge",
+      "Citation judge prompt",
+      baseline.runtime.promptVersions.citationJudge,
+      candidate.runtime.promptVersions.citationJudge,
+    ),
   ]);
   const configurationDifferences = compact([
     difference("provider", "Provider", baseline.runtime.provider, candidate.runtime.provider),
-    difference("retrieval", "Retrieval configuration", baseline.runtime.retrieval, candidate.runtime.retrieval),
-    difference("resolutionPolicy", "Resolution policy", baseline.runtime.resolutionPolicy, candidate.runtime.resolutionPolicy),
-    difference("thresholdVersion", "Threshold version", baseline.thresholdVersion, candidate.thresholdVersion),
+    difference(
+      "retrieval",
+      "Retrieval configuration",
+      baseline.runtime.retrieval,
+      candidate.runtime.retrieval,
+    ),
+    difference(
+      "resolutionPolicy",
+      "Resolution policy",
+      baseline.runtime.resolutionPolicy,
+      candidate.runtime.resolutionPolicy,
+    ),
+    difference(
+      "thresholdVersion",
+      "Threshold version",
+      baseline.thresholdVersion,
+      candidate.thresholdVersion,
+    ),
     difference(
       "thresholds",
       "Thresholds",
@@ -138,26 +168,49 @@ export function compareEvaluationRuns(
       candidate.thresholds.map(({ metric, threshold }) => ({ metric, threshold })),
     ),
     difference("pricing", "Pricing", baseline.runtime.pricing, candidate.runtime.pricing),
-    difference("concurrency", "Concurrency", baseline.runtime.concurrency, candidate.runtime.concurrency),
+    difference(
+      "concurrency",
+      "Concurrency",
+      baseline.runtime.concurrency,
+      candidate.runtime.concurrency,
+    ),
   ]);
 
   const qualityKeys = [
-    "schemaValidity", "categoryAccuracy", "priorityAccuracy", "actionAccuracy",
-    "retrievalRecallAt5", "citationExistence", "citationSupport",
-    "abstentionAccuracy", "abstentionPrecision", "abstentionRecall",
+    "schemaValidity",
+    "categoryAccuracy",
+    "priorityAccuracy",
+    "actionAccuracy",
+    "retrievalRecallAt5",
+    "citationExistence",
+    "citationSupport",
+    "abstentionAccuracy",
+    "abstentionPrecision",
+    "abstentionRecall",
   ] as const;
-  const quality = Object.fromEntries(qualityKeys.map((key) => [
-    key,
-    qualityDelta(baseline.metrics.quality[key], candidate.metrics.quality[key]),
-  ]));
+  const quality = Object.fromEntries(
+    qualityKeys.map((key) => [
+      key,
+      qualityDelta(baseline.metrics.quality[key], candidate.metrics.quality[key]),
+    ]),
+  );
   const operationKeys = [
-    "latencyP50Ms", "latencyP95Ms", "generationInputTokens", "generationOutputTokens",
-    "judgeInputTokens", "judgeOutputTokens", "retryCount", "errorCount", "estimatedCostUsd",
+    "latencyP50Ms",
+    "latencyP95Ms",
+    "generationInputTokens",
+    "generationOutputTokens",
+    "judgeInputTokens",
+    "judgeOutputTokens",
+    "retryCount",
+    "errorCount",
+    "estimatedCostUsd",
   ] as const;
-  const operations = Object.fromEntries(operationKeys.map((key) => [
-    key,
-    numericDelta(baseline.metrics.operations[key], candidate.metrics.operations[key]),
-  ]));
+  const operations = Object.fromEntries(
+    operationKeys.map((key) => [
+      key,
+      numericDelta(baseline.metrics.operations[key], candidate.metrics.operations[key]),
+    ]),
+  );
 
   const candidateCases = new Map(candidate.cases.map((item) => [item.caseId, item]));
   const cases = [...baseline.cases]

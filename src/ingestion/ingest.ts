@@ -14,9 +14,7 @@ export type IngestionRepository = {
     title: string;
     contentHash: string;
     metadata: ParsedKnowledgeDocument["metadata"];
-    chunks: Array<
-      ParsedKnowledgeDocument["chunks"][number] & { embedding: number[] }
-    >;
+    chunks: Array<ParsedKnowledgeDocument["chunks"][number] & { embedding: number[] }>;
   }): Promise<void>;
 };
 

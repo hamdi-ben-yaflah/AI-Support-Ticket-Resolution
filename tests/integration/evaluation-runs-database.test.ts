@@ -4,10 +4,7 @@ import { eq } from "drizzle-orm";
 import type { EvaluationReport } from "@/evals/contracts";
 import { makeEvaluationReport } from "../support/evaluation";
 
-const runIds = [
-  "51111111-1111-4111-8111-111111111111",
-  "52222222-2222-4222-8222-222222222222",
-];
+const runIds = ["51111111-1111-4111-8111-111111111111", "52222222-2222-4222-8222-222222222222"];
 
 function isolatedTestUrl(): string {
   const value = process.env.TEST_DATABASE_URL;
@@ -89,11 +86,8 @@ describe("PostgreSQL evaluation history repository", () => {
   });
 
   it("lists deterministically and loads both runs with one case set each", async () => {
-    const {
-      listRecentEvaluationRuns,
-      loadEvaluationRunPair,
-      persistEvaluationReport,
-    } = await import("@/db/evaluation-runs");
+    const { listRecentEvaluationRuns, loadEvaluationRunPair, persistEvaluationReport } =
+      await import("@/db/evaluation-runs");
     await expect(persistEvaluationReport(candidate)).resolves.toBe("created");
 
     const recent = await listRecentEvaluationRuns(50);

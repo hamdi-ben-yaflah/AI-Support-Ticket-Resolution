@@ -1,7 +1,4 @@
-import {
-  EvaluationReportSchema,
-  type EvaluationReport,
-} from "@/evals/contracts";
+import { EvaluationReportSchema, type EvaluationReport } from "@/evals/contracts";
 import {
   PersistedEvaluationRunSchema,
   type PersistedEvaluationRun,

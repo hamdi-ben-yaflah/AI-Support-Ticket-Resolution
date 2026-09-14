@@ -31,9 +31,7 @@ export function gradeExecution(input: {
       .filter((sourceId) => expected.relevantSourceIds.includes(sourceId)),
   );
   const citations =
-    proposal.action === "needs_human_review"
-      ? []
-      : proposal.groundedReply.citations;
+    proposal.action === "needs_human_review" ? [] : proposal.groundedReply.citations;
   const retrievedChunkIds = new Set(input.retrieved.map((item) => item.chunkId));
   const existingCitations = citations.filter((item) => retrievedChunkIds.has(item.chunkId));
   const supported = input.judgeDecisions.filter((decision) => decision.supported).length;
@@ -83,15 +81,11 @@ function abstentionMetric(
   results: readonly EvaluationCaseResult[],
   mode: "precision" | "recall",
 ): EvaluationMetric {
-  const predicted = results.filter(
-    (result) => result.actual?.action === "needs_human_review",
-  );
+  const predicted = results.filter((result) => result.actual?.action === "needs_human_review");
   const expected = results.filter((result) => result.expected.shouldAbstain);
   const population = mode === "precision" ? predicted : expected;
   const numerator = population.filter(
-    (result) =>
-      result.expected.shouldAbstain &&
-      result.actual?.action === "needs_human_review",
+    (result) => result.expected.shouldAbstain && result.actual?.action === "needs_human_review",
   ).length;
   return {
     numerator,
@@ -108,18 +102,10 @@ export function aggregateQualityMetrics(
     categoryAccuracy: booleanMetric(results.map((result) => result.scores.categoryCorrect)),
     priorityAccuracy: booleanMetric(results.map((result) => result.scores.priorityCorrect)),
     actionAccuracy: booleanMetric(results.map((result) => result.scores.actionCorrect)),
-    retrievalRecallAt5: optionalAverage(
-      results.map((result) => result.scores.retrievalRecallAt5),
-    ),
-    citationExistence: optionalAverage(
-      results.map((result) => result.scores.citationExistence),
-    ),
-    citationSupport: optionalAverage(
-      results.map((result) => result.scores.citationSupport),
-    ),
-    abstentionAccuracy: booleanMetric(
-      results.map((result) => result.scores.abstentionCorrect),
-    ),
+    retrievalRecallAt5: optionalAverage(results.map((result) => result.scores.retrievalRecallAt5)),
+    citationExistence: optionalAverage(results.map((result) => result.scores.citationExistence)),
+    citationSupport: optionalAverage(results.map((result) => result.scores.citationSupport)),
+    abstentionAccuracy: booleanMetric(results.map((result) => result.scores.abstentionCorrect)),
     abstentionPrecision: abstentionMetric(results, "precision"),
     abstentionRecall: abstentionMetric(results, "recall"),
   };

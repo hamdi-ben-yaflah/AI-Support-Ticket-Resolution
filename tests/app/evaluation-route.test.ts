@@ -25,6 +25,20 @@ function request(body: string, contentType = "application/json") {
 }
 
 describe("POST /api/evaluations/run", () => {
+  it("returns a non-revealing 404 when live evaluations are disabled", async () => {
+    const run = vi.fn();
+    const response = await createEvaluationRunHandler({
+      run,
+      createTraceId: () => evaluationTraceId,
+      isEnabled: () => false,
+    })(request(JSON.stringify({ concurrency: 3 })));
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(await response.text()).toBe("");
+    expect(run).not.toHaveBeenCalled();
+  });
+
   it("returns a threshold regression as valid non-cacheable report data without auth", async () => {
     const regression = {
       ...report,
@@ -66,7 +80,9 @@ describe("POST /api/evaluations/run", () => {
 
   it("rejects an overlapping in-process run with 409", async () => {
     let finish!: (value: EvaluationReport) => void;
-    const pending = new Promise<EvaluationReport>((resolve) => { finish = resolve; });
+    const pending = new Promise<EvaluationReport>((resolve) => {
+      finish = resolve;
+    });
     const handler = createEvaluationRunHandler({
       run: () => pending,
       createTraceId: () => evaluationTraceId,
@@ -81,9 +97,9 @@ describe("POST /api/evaluations/run", () => {
 
   it("maps setup errors without leaking their details", async () => {
     const response = await createEvaluationRunHandler({
-      run: vi.fn().mockRejectedValue(
-        new EvaluationSetupError("configuration", "ANTHROPIC_API_KEY=secret"),
-      ),
+      run: vi
+        .fn()
+        .mockRejectedValue(new EvaluationSetupError("configuration", "ANTHROPIC_API_KEY=secret")),
       createTraceId: () => evaluationTraceId,
       log: logger(),
     })(request(JSON.stringify({ concurrency: 3 })));

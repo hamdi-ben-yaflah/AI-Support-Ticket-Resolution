@@ -53,30 +53,76 @@ describe("PostgreSQL knowledge repository", () => {
       title: "Integration source",
       metadata: { category: "billing" as const, version: "1" },
     };
-    await replaceDocument({ ...base, contentHash: "a".repeat(64), chunks: [{ chunkIndex: 0, section: "First", content: "First content", tokenCount: 2, embedding: vector(1, 0), metadata: { sourceId, category: "billing", version: "1" } }] });
-    expect(await getDocumentContentHashes([sourceId])).toEqual(new Map([[sourceId, "a".repeat(64)]]));
+    await replaceDocument({
+      ...base,
+      contentHash: "a".repeat(64),
+      chunks: [
+        {
+          chunkIndex: 0,
+          section: "First",
+          content: "First content",
+          tokenCount: 2,
+          embedding: vector(1, 0),
+          metadata: { sourceId, category: "billing", version: "1" },
+        },
+      ],
+    });
+    expect(await getDocumentContentHashes([sourceId])).toEqual(
+      new Map([[sourceId, "a".repeat(64)]]),
+    );
 
-    await replaceDocument({ ...base, contentHash: "b".repeat(64), chunks: [{ chunkIndex: 0, section: "Replacement", content: "Replacement content", tokenCount: 2, embedding: vector(0, 1), metadata: { sourceId, category: "billing", version: "1" } }] });
-    const result = await searchDocumentChunks({ embedding: vector(0, 1), category: "billing", limit: 5 });
+    await replaceDocument({
+      ...base,
+      contentHash: "b".repeat(64),
+      chunks: [
+        {
+          chunkIndex: 0,
+          section: "Replacement",
+          content: "Replacement content",
+          tokenCount: 2,
+          embedding: vector(0, 1),
+          metadata: { sourceId, category: "billing", version: "1" },
+        },
+      ],
+    });
+    const result = await searchDocumentChunks({
+      embedding: vector(0, 1),
+      category: "billing",
+      limit: 5,
+    });
     expect(result.filter((row) => row.metadata.sourceId === sourceId)).toHaveLength(1);
-    expect(result.find((row) => row.metadata.sourceId === sourceId)).toMatchObject({ section: "Replacement", similarity: 1 });
+    expect(result.find((row) => row.metadata.sourceId === sourceId)).toMatchObject({
+      section: "Replacement",
+      similarity: 1,
+    });
 
     await replaceDocument({
       ...base,
       contentHash: "c".repeat(64),
       chunks: [
-        { chunkIndex: 1, section: "Second", content: "Second content", tokenCount: 2, embedding: vector(0, 1), metadata: { sourceId, category: "billing", version: "1" } },
-        { chunkIndex: 0, section: "First", content: "First content", tokenCount: 2, embedding: vector(1, 0), metadata: { sourceId, category: "billing", version: "1" } },
+        {
+          chunkIndex: 1,
+          section: "Second",
+          content: "Second content",
+          tokenCount: 2,
+          embedding: vector(0, 1),
+          metadata: { sourceId, category: "billing", version: "1" },
+        },
+        {
+          chunkIndex: 0,
+          section: "First",
+          content: "First content",
+          tokenCount: 2,
+          embedding: vector(1, 0),
+          metadata: { sourceId, category: "billing", version: "1" },
+        },
       ],
     });
     const inspected = (await inspectDocumentChunks()).filter(
       (chunk) => chunk.sourceId === sourceId,
     );
     expect(inspected.map((chunk) => chunk.chunkIndex)).toEqual([0, 1]);
-    expect(inspected.map((chunk) => chunk.content)).toEqual([
-      "First content",
-      "Second content",
-    ]);
+    expect(inspected.map((chunk) => chunk.content)).toEqual(["First content", "Second content"]);
     expect(inspected[0]).toMatchObject({
       sourceId,
       title: "Integration source",

@@ -3,17 +3,21 @@ import { z } from "zod";
 import { ClassificationSchema } from "@/domain/classification";
 import { RefundReviewActionProposalSchema } from "@/domain/refund-review";
 
-export const CitationSchema = z.object({
-  chunkId: z.string().uuid(),
-  sourceId: z.string().trim().min(1).max(120),
-  section: z.string().trim().min(1).max(300),
-  claim: z.string().trim().min(1).max(300),
-}).strict();
+export const CitationSchema = z
+  .object({
+    chunkId: z.string().uuid(),
+    sourceId: z.string().trim().min(1).max(120),
+    section: z.string().trim().min(1).max(300),
+    claim: z.string().trim().min(1).max(300),
+  })
+  .strict();
 
-export const GroundedReplySchema = z.object({
-  suggestedResponse: z.string().trim().min(1).max(4_000),
-  citations: z.array(CitationSchema).min(1).max(8),
-}).strict();
+export const GroundedReplySchema = z
+  .object({
+    suggestedResponse: z.string().trim().min(1).max(4_000),
+    citations: z.array(CitationSchema).min(1).max(8),
+  })
+  .strict();
 
 export const ResolutionReasonSchema = z.string().trim().min(1).max(300);
 
@@ -37,9 +41,7 @@ export const RefundReviewResolutionProposalSchema = ClassificationSchema.extend(
 })
   .strict()
   .superRefine((proposal, context) => {
-    const citationIds = proposal.groundedReply.citations.map(
-      (citation) => citation.chunkId,
-    );
+    const citationIds = proposal.groundedReply.citations.map((citation) => citation.chunkId);
     const evidenceIds = proposal.actionProposal.arguments.evidenceChunkIds;
     if (
       citationIds.length !== evidenceIds.length ||
@@ -76,10 +78,6 @@ export const ResolutionProposalSchema = z.discriminatedUnion("action", [
 export type Citation = z.infer<typeof CitationSchema>;
 export type GroundedReply = z.infer<typeof GroundedReplySchema>;
 export type ReplyResolutionProposal = z.infer<typeof ReplyResolutionProposalSchema>;
-export type RefundReviewResolutionProposal = z.infer<
-  typeof RefundReviewResolutionProposalSchema
->;
-export type HumanReviewResolutionProposal = z.infer<
-  typeof HumanReviewResolutionProposalSchema
->;
+export type RefundReviewResolutionProposal = z.infer<typeof RefundReviewResolutionProposalSchema>;
+export type HumanReviewResolutionProposal = z.infer<typeof HumanReviewResolutionProposalSchema>;
 export type ResolutionProposal = z.infer<typeof ResolutionProposalSchema>;

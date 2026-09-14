@@ -65,7 +65,11 @@ export const PersistedEvaluationRunSchema = EvaluationRunSummarySchema.safeExten
       context.addIssue({ code: "custom", path: ["cases"], message: "Case IDs must be unique." });
     }
     if (value.dataset.caseCount !== value.cases.length) {
-      context.addIssue({ code: "custom", path: ["cases"], message: "Case count must match the dataset." });
+      context.addIssue({
+        code: "custom",
+        path: ["cases"],
+        message: "Case count must match the dataset.",
+      });
     }
   });
 

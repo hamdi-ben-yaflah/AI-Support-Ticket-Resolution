@@ -2,10 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import {
-  EvaluationRepositoryError,
-  loadEvaluationRunPair,
-} from "@/db/evaluation-runs";
+import { isLiveEvaluationEnabled } from "@/config/deployment";
+import { EvaluationRepositoryError, loadEvaluationRunPair } from "@/db/evaluation-runs";
 import { createApiResultSchema, type ApiErrorCode, type ApiResult } from "@/domain/api-result";
 import {
   EvaluationComparisonRequestSchema,
@@ -13,10 +11,7 @@ import {
   type EvaluationComparison,
   type PersistedEvaluationRun,
 } from "@/evals/comparison-contracts";
-import {
-  compareEvaluationRuns,
-  EvaluationComparisonError,
-} from "@/evals/comparison";
+import { compareEvaluationRuns, EvaluationComparisonError } from "@/evals/comparison";
 import { logger, type AppLogger } from "@/observability/logger";
 
 const ResultSchema = createApiResultSchema(EvaluationComparisonSchema);
@@ -28,8 +23,16 @@ type Dependencies = {
   ) => Promise<[PersistedEvaluationRun, PersistedEvaluationRun]>;
   compare?: typeof compareEvaluationRuns;
   createTraceId?: () => string;
+  isEnabled?: () => boolean;
   log?: AppLogger;
 };
+
+function disabledResponse(): Response {
+  return new Response(null, {
+    status: 404,
+    headers: { "Cache-Control": "private, no-store" },
+  });
+}
 
 function response(
   body: ApiResult<EvaluationComparison>,
@@ -57,7 +60,8 @@ function parseRequest(request: Request) {
     [...search.keys()].some((key) => key !== "baseline" && key !== "candidate") ||
     search.getAll("baseline").length !== 1 ||
     search.getAll("candidate").length !== 1
-  ) return null;
+  )
+    return null;
   const parsed = EvaluationComparisonRequestSchema.safeParse({
     baseline: search.get("baseline"),
     candidate: search.get("candidate"),
@@ -69,9 +73,12 @@ export function createEvaluationCompareHandler(dependencies: Dependencies = {}) 
   const load = dependencies.load ?? loadEvaluationRunPair;
   const compare = dependencies.compare ?? compareEvaluationRuns;
   const createTraceId = dependencies.createTraceId ?? randomUUID;
+  const isEnabled = dependencies.isEnabled ?? isLiveEvaluationEnabled;
   const log = dependencies.log ?? logger;
 
   return async function GET(request: Request): Promise<Response> {
+    if (!isEnabled()) return disabledResponse();
+
     const traceId = createTraceId();
     const input = parseRequest(request);
     if (!input) {
@@ -105,7 +112,8 @@ export function createEvaluationCompareHandler(dependencies: Dependencies = {}) 
           false,
         );
       }
-      const unavailable = error instanceof EvaluationRepositoryError && error.code === "unavailable";
+      const unavailable =
+        error instanceof EvaluationRepositoryError && error.code === "unavailable";
       log.error({
         event: "evaluation_comparison_failed",
         traceId,

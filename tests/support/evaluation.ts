@@ -1,7 +1,4 @@
-import {
-  ResolutionExecutionSchema,
-  type ResolutionExecution,
-} from "@/domain/resolution-run";
+import { ResolutionExecutionSchema, type ResolutionExecution } from "@/domain/resolution-run";
 import type { GoldenCase } from "@/evals/contracts";
 import type { GoldenDataset } from "@/evals/dataset";
 import { runEvaluation } from "@/evals/runner";
@@ -27,15 +24,17 @@ export function makeGoldenCases(count = 30): GoldenCase[] {
 }
 
 export function makeEvidence(): RetrievedEvidence[] {
-  return [{
-    chunkId: evaluationChunkId,
-    sourceId: "duplicate-charges",
-    title: "Duplicate charges",
-    section: "When both charges settled",
-    content: "Two settled duplicate charges may be submitted for review.",
-    tokenCount: 10,
-    similarity: 0.95,
-  }];
+  return [
+    {
+      chunkId: evaluationChunkId,
+      sourceId: "duplicate-charges",
+      title: "Duplicate charges",
+      section: "When both charges settled",
+      content: "Two settled duplicate charges may be submitted for review.",
+      tokenCount: 10,
+      similarity: 0.95,
+    },
+  ];
 }
 
 export function makeExecution(): ResolutionExecution {
@@ -49,22 +48,26 @@ export function makeExecution(): ResolutionExecution {
       reason: "The duplicate-charge policy supports a response.",
       groundedReply: {
         suggestedResponse: "We can submit the duplicate charge for review.",
-        citations: [{
-          chunkId: evaluationChunkId,
-          sourceId: "duplicate-charges",
-          section: "When both charges settled",
-          claim: "Settled duplicate charges may be reviewed.",
-        }],
+        citations: [
+          {
+            chunkId: evaluationChunkId,
+            sourceId: "duplicate-charges",
+            section: "When both charges settled",
+            claim: "Settled duplicate charges may be reviewed.",
+          },
+        ],
       },
     },
-    citedSources: [{
-      citationPosition: 0,
-      chunkId: evaluationChunkId,
-      sourceId: "duplicate-charges",
-      title: "Duplicate charges",
-      section: "When both charges settled",
-      content: "Two settled duplicate charges may be submitted for review.",
-    }],
+    citedSources: [
+      {
+        citationPosition: 0,
+        chunkId: evaluationChunkId,
+        sourceId: "duplicate-charges",
+        title: "Duplicate charges",
+        section: "When both charges settled",
+        content: "Two settled duplicate charges may be submitted for review.",
+      },
+    ],
     metadata: {
       promptVersions: { classification: "classify.v1", resolution: "resolve.v4" },
       resolutionPolicy: { version: "resolution-policy.v1", minimumConfidence: 0.65 },
@@ -137,11 +140,13 @@ export async function makeEvaluationReport() {
       },
       judge: async () => ({
         value: {
-          decisions: [{
-            citationId: evaluationChunkId,
-            supported: true,
-            rationale: "The evidence directly supports the claim.",
-          }],
+          decisions: [
+            {
+              citationId: evaluationChunkId,
+              supported: true,
+              rationale: "The evidence directly supports the claim.",
+            },
+          ],
         },
         model: "fake-model",
         finishReason: "end_turn",

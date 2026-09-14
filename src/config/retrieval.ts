@@ -7,12 +7,7 @@ const RetrievalConfigSchema = z
     RETRIEVAL_CANDIDATE_COUNT: z.coerce.number().int().min(1).max(50).default(8),
     RETRIEVAL_FINAL_COUNT: z.coerce.number().int().min(1).max(8).default(5),
     RETRIEVAL_MINIMUM_SIMILARITY: z.coerce.number().min(-1).max(1).default(0.65),
-    RETRIEVAL_MAXIMUM_CONTEXT_TOKENS: z.coerce
-      .number()
-      .int()
-      .min(100)
-      .max(10_000)
-      .default(3_500),
+    RETRIEVAL_MAXIMUM_CONTEXT_TOKENS: z.coerce.number().int().min(100).max(10_000).default(3_500),
     RETRIEVAL_MINIMUM_EVIDENCE_COUNT: z.coerce.number().int().min(1).max(8).default(1),
   })
   .refine((value) => value.RETRIEVAL_FINAL_COUNT <= value.RETRIEVAL_CANDIDATE_COUNT, {
@@ -28,9 +23,7 @@ export type RetrievalConfig = {
   version: "retrieval.v1";
 };
 
-export function getRetrievalConfig(
-  environment: NodeJS.ProcessEnv = process.env,
-): RetrievalConfig {
+export function getRetrievalConfig(environment: NodeJS.ProcessEnv = process.env): RetrievalConfig {
   const parsed = RetrievalConfigSchema.safeParse(environment);
   if (!parsed.success) {
     throw new Error("Retrieval configuration is invalid.");

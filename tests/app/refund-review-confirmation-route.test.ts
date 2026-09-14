@@ -23,17 +23,14 @@ function logger() {
 }
 
 function request(body: string, cookie = "support_copilot_session=signed-secret") {
-  return new Request(
-    `http://localhost/api/actions/refund-review/${proposalId}/confirm`,
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie,
-      },
-      body,
+  return new Request(`http://localhost/api/actions/refund-review/${proposalId}/confirm`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      cookie,
     },
-  );
+    body,
+  });
 }
 
 function context(id = proposalId) {
@@ -85,9 +82,7 @@ describe("POST /api/actions/refund-review/:proposalId/confirm", () => {
     expect(missingConfirm).not.toHaveBeenCalled();
 
     const denied = await createRefundReviewConfirmationHandler({
-      confirm: vi.fn().mockRejectedValue(
-        new ActionAuditRepositoryError("not_found"),
-      ),
+      confirm: vi.fn().mockRejectedValue(new ActionAuditRepositoryError("not_found")),
       getSessionHash: () => sessionHash,
       createTraceId: () => traceId,
       log: logger(),
@@ -136,11 +131,13 @@ describe("POST /api/actions/refund-review/:proposalId/confirm", () => {
         error: { code: "action_unavailable", retryable: true },
       });
       expect(JSON.stringify(body)).not.toContain("sensitive database detail");
-      expect(JSON.stringify({
-        info: vi.mocked(log.info).mock.calls,
-        warn: vi.mocked(log.warn).mock.calls,
-        error: vi.mocked(log.error).mock.calls,
-      })).not.toContain("signed-secret");
+      expect(
+        JSON.stringify({
+          info: vi.mocked(log.info).mock.calls,
+          warn: vi.mocked(log.warn).mock.calls,
+          error: vi.mocked(log.error).mock.calls,
+        }),
+      ).not.toContain("signed-secret");
     }
   });
 });

@@ -25,9 +25,7 @@ describe("anonymous signed sessions", () => {
     const value = signSessionCookie(sessionId, nowSeconds + 60, secret);
     expect(verifySessionCookie(value, secret, nowSeconds)).toBe(sessionId);
     expect(verifySessionCookie(value, secret, nowSeconds + 60)).toBeUndefined();
-    expect(
-      verifySessionCookie(`${value.slice(0, -1)}x`, secret, nowSeconds),
-    ).toBeUndefined();
+    expect(verifySessionCookie(`${value.slice(0, -1)}x`, secret, nowSeconds)).toBeUndefined();
     expect(verifySessionCookie(value.replace("v1.", "v2."), secret, nowSeconds)).toBeUndefined();
     expect(verifySessionCookie("malformed", secret, nowSeconds)).toBeUndefined();
   });
@@ -77,9 +75,7 @@ describe("anonymous signed sessions", () => {
       nowSeconds,
     });
     expect(reused.cookie).toBeUndefined();
-    expect(getVerifiedSessionHash(validRequest, { config, nowSeconds })).toBe(
-      reused.sessionHash,
-    );
+    expect(getVerifiedSessionHash(validRequest, { config, nowSeconds })).toBe(reused.sessionHash);
 
     const tamperedRequest = new Request("http://localhost", {
       headers: { cookie: `${SESSION_COOKIE_NAME}=${validCookie.slice(0, -1)}x` },
@@ -94,9 +90,7 @@ describe("anonymous signed sessions", () => {
   });
 
   it("requires a strong server-only secret", () => {
-    expect(() =>
-      getSessionConfig({ ...process.env, SESSION_COOKIE_SECRET: "short" }),
-    ).toThrow(
+    expect(() => getSessionConfig({ ...process.env, SESSION_COOKIE_SECRET: "short" })).toThrow(
       SessionConfigurationError,
     );
   });

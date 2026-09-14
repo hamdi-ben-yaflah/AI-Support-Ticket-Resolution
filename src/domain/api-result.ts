@@ -44,5 +44,4 @@ export function createApiResultSchema<T extends z.ZodType>(dataSchema: T) {
 export type ApiErrorCode = z.infer<typeof ApiErrorCodeSchema>;
 export type ApiError = z.infer<typeof ApiErrorSchema>;
 export type ApiResult<T> =
-  | { ok: true; traceId: string; data: T }
-  | { ok: false; traceId: string; error: ApiError };
+  { ok: true; traceId: string; data: T } | { ok: false; traceId: string; error: ApiError };

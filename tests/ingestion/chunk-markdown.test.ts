@@ -8,7 +8,9 @@ function document(body: string, sourceId = "test-source") {
 
 describe("parseKnowledgeDocument", () => {
   it("preserves heading paths and deterministic indexes and hashes", () => {
-    const raw = document("# Product\n\nIntro.\n\n## Setup\n\nFollow the safe setup steps.\n\n### Browser\n\nRestart the browser.");
+    const raw = document(
+      "# Product\n\nIntro.\n\n## Setup\n\nFollow the safe setup steps.\n\n### Browser\n\nRestart the browser.",
+    );
     const first = parseKnowledgeDocument("test.md", raw);
     const second = parseKnowledgeDocument("test.md", raw);
     expect(first.contentHash).toBe(second.contentHash);
@@ -24,7 +26,9 @@ describe("parseKnowledgeDocument", () => {
     const body = `# Large section\n\n${"A repeatable troubleshooting instruction with several details. ".repeat(180)}`;
     const parsed = parseKnowledgeDocument("large.md", document(body));
     expect(parsed.chunks.length).toBeGreaterThan(1);
-    expect(parsed.chunks.every((chunk) => chunk.tokenCount <= 600 && chunk.content.length > 0)).toBe(true);
+    expect(
+      parsed.chunks.every((chunk) => chunk.tokenCount <= 600 && chunk.content.length > 0),
+    ).toBe(true);
     expect(parsed.chunks.every((chunk) => chunk.section === "Large section")).toBe(true);
   });
 

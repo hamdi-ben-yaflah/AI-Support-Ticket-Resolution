@@ -3,10 +3,7 @@ import "server-only";
 import { LlmError } from "@/ai/errors";
 import type { GenerateResult, LlmProvider } from "@/ai/types";
 import type { ResolutionExecution } from "@/domain/resolution-run";
-import {
-  CitationJudgeOutputSchema,
-  type CitationJudgeOutput,
-} from "@/evals/contracts";
+import { CitationJudgeOutputSchema, type CitationJudgeOutput } from "@/evals/contracts";
 import {
   buildCitationJudgeInput,
   CITATION_JUDGE_PROMPT_VERSION,

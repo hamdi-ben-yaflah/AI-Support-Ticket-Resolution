@@ -9,10 +9,7 @@ import {
 import { AnthropicLlmProvider } from "@/ai/providers/anthropic";
 import type { GenerateRequest, LlmProvider } from "@/ai/types";
 import { getAiConfig } from "@/config/ai";
-import {
-  ClassificationSchema,
-  type Classification,
-} from "@/domain/classification";
+import { ClassificationSchema, type Classification } from "@/domain/classification";
 import type { TicketInput } from "@/domain/ticket";
 import { createLogger, logger, type AppLogger } from "@/observability/logger";
 

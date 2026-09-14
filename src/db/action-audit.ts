@@ -8,11 +8,7 @@ import {
   type MockRefundReviewExecutor,
 } from "@/actions/request-refund-review";
 import { getDatabase } from "@/db/client";
-import {
-  actionAudit,
-  resolutionRuns,
-  resolutionRunSources,
-} from "@/db/schema";
+import { actionAudit, resolutionRuns, resolutionRunSources } from "@/db/schema";
 import {
   MockRefundReviewResultSchema,
   RequestRefundReviewArgsSchema,
@@ -54,9 +50,7 @@ function sameArguments(
     left.reason === right.reason &&
     left.ticketSummary === right.ticketSummary &&
     left.evidenceChunkIds.length === right.evidenceChunkIds.length &&
-    left.evidenceChunkIds.every(
-      (chunkId, index) => right.evidenceChunkIds[index] === chunkId,
-    )
+    left.evidenceChunkIds.every((chunkId, index) => right.evidenceChunkIds[index] === chunkId)
   );
 }
 
@@ -80,10 +74,7 @@ export async function confirmOwnedRefundReview(
           classification: resolutionRuns.classification,
         })
         .from(actionAudit)
-        .innerJoin(
-          resolutionRuns,
-          eq(actionAudit.resolutionRunId, resolutionRuns.id),
-        )
+        .innerJoin(resolutionRuns, eq(actionAudit.resolutionRunId, resolutionRuns.id))
         .where(
           and(
             eq(actionAudit.proposalId, input.proposalId),
@@ -107,9 +98,7 @@ export async function confirmOwnedRefundReview(
 
       const storedAction = ResolutionActionSchema.parse(row.action);
       const classification = ClassificationSchema.parse(row.classification);
-      const arguments_ = RequestRefundReviewArgsSchema.parse(
-        row.proposedArguments,
-      );
+      const arguments_ = RequestRefundReviewArgsSchema.parse(row.proposedArguments);
       if (
         storedAction.type !== "request_refund_review" ||
         classification.category !== "billing" ||
@@ -128,24 +117,14 @@ export async function confirmOwnedRefundReview(
         .from(resolutionRunSources)
         .where(
           and(
-            eq(
-              resolutionRunSources.resolutionRunId,
-              row.resolutionRunId,
-            ),
-            inArray(
-              resolutionRunSources.chunkId,
-              arguments_.evidenceChunkIds,
-            ),
+            eq(resolutionRunSources.resolutionRunId, row.resolutionRunId),
+            inArray(resolutionRunSources.chunkId, arguments_.evidenceChunkIds),
           ),
         );
-      const ownedEvidenceIds = new Set(
-        evidenceRows.map((source) => source.chunkId),
-      );
+      const ownedEvidenceIds = new Set(evidenceRows.map((source) => source.chunkId));
       if (
         ownedEvidenceIds.size !== arguments_.evidenceChunkIds.length ||
-        arguments_.evidenceChunkIds.some(
-          (chunkId) => !ownedEvidenceIds.has(chunkId),
-        )
+        arguments_.evidenceChunkIds.some((chunkId) => !ownedEvidenceIds.has(chunkId))
       ) {
         throw new ActionAuditRepositoryError("unavailable");
       }

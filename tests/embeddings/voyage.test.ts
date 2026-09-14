@@ -1,8 +1,4 @@
-import {
-  VoyageAIClient,
-  VoyageAIError,
-  VoyageAITimeoutError,
-} from "voyageai";
+import { VoyageAIClient, VoyageAIError, VoyageAITimeoutError } from "voyageai";
 import { describe, expect, it, vi } from "vitest";
 
 import { VoyageEmbeddingProvider } from "@/embeddings/providers/voyage";
@@ -21,11 +17,7 @@ function sdkResponse(data: Array<{ index: number; embedding: number[] }>) {
   return { data: response(data), rawResponse: new Response() };
 }
 
-function provider(
-  embed: ReturnType<typeof vi.fn>,
-  dimensions = 2,
-  maxRetries = 0,
-) {
+function provider(embed: ReturnType<typeof vi.fn>, dimensions = 2, maxRetries = 0) {
   return new VoyageEmbeddingProvider({
     apiKey: "test",
     model: "voyage-4",

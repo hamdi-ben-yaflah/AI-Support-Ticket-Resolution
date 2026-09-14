@@ -1,10 +1,6 @@
 import "server-only";
 
-import {
-  createHmac,
-  randomBytes,
-  timingSafeEqual,
-} from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 import {
   getSessionConfig,
@@ -139,10 +135,7 @@ export function getOrCreateResolutionSession(
 ): ResolutionSession {
   const config = options.config ?? getSessionConfig();
   const nowSeconds = options.nowSeconds ?? Math.floor(Date.now() / 1_000);
-  const existingValue = parseCookieHeader(
-    request.headers.get("cookie"),
-    SESSION_COOKIE_NAME,
-  );
+  const existingValue = parseCookieHeader(request.headers.get("cookie"), SESSION_COOKIE_NAME);
   const existingId = verifySessionCookie(existingValue, config.secret, nowSeconds);
   const sessionId =
     existingId ??

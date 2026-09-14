@@ -81,9 +81,7 @@ export async function replaceDocument(input: PersistedDocumentInput): Promise<vo
       .returning({ id: documents.id });
 
     if (!document) throw new Error("Document upsert returned no identifier.");
-    await transaction
-      .delete(documentChunks)
-      .where(eq(documentChunks.documentId, document.id));
+    await transaction.delete(documentChunks).where(eq(documentChunks.documentId, document.id));
 
     if (chunkValues.length > 0) {
       await transaction.insert(documentChunks).values(
@@ -127,9 +125,7 @@ export async function searchDocumentChunks(input: {
   return z.array(SearchRowSchema).parse(rows);
 }
 
-export async function inspectDocumentChunks(): Promise<
-  KnowledgeChunkInspection[]
-> {
+export async function inspectDocumentChunks(): Promise<KnowledgeChunkInspection[]> {
   const rows = await getDatabase()
     .select({
       chunkId: documentChunks.id,
@@ -151,5 +147,7 @@ export async function inspectDocumentChunks(): Promise<
 
 export async function deleteDocumentsBySourceIds(sourceIds: readonly string[]): Promise<void> {
   if (sourceIds.length === 0) return;
-  await getDatabase().delete(documents).where(inArray(documents.sourceId, [...sourceIds]));
+  await getDatabase()
+    .delete(documents)
+    .where(inArray(documents.sourceId, [...sourceIds]));
 }

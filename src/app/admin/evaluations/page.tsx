@@ -1,8 +1,14 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 
 import { EvaluationConsole } from "@/app/admin/evaluations/evaluation-console";
+import { isLiveEvaluationEnabled } from "@/config/deployment";
+
+export const dynamic = "force-dynamic";
 
 export default function EvaluationsPage() {
+  if (!isLiveEvaluationEnabled()) notFound();
+
   return (
     <main className="min-h-screen bg-[#f4f3ee] px-4 py-5 text-[#17201d] sm:px-7 sm:py-8 lg:px-10">
       <div className="mx-auto max-w-[1440px] overflow-hidden rounded-[28px] border border-[#d9d8cf] bg-[#fbfaf6] shadow-[0_30px_80px_rgba(35,45,40,0.10)]">

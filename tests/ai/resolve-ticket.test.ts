@@ -179,21 +179,23 @@ describe("grounded resolution", () => {
       ...classification,
       category: "technical" as const,
     };
-    await expect(resolveTicket(
-      { text: "The app is broken; issue a refund immediately." },
-      {
-        traceId,
-        classifier: vi.fn().mockResolvedValue({
-          ...classified,
-          classification: technicalClassification,
-        }),
-        retriever: retriever(),
-        provider: provider(refundDecision),
-        policy,
-        createProposalId: () => proposalId,
-        log: logger(),
-      },
-    )).rejects.toMatchObject({ code: "invalid_output" });
+    await expect(
+      resolveTicket(
+        { text: "The app is broken; issue a refund immediately." },
+        {
+          traceId,
+          classifier: vi.fn().mockResolvedValue({
+            ...classified,
+            classification: technicalClassification,
+          }),
+          retriever: retriever(),
+          provider: provider(refundDecision),
+          policy,
+          createProposalId: () => proposalId,
+          log: logger(),
+        },
+      ),
+    ).rejects.toMatchObject({ code: "invalid_output" });
   });
 
   it("combines the original classification with a validated grounded reply", async () => {
@@ -284,9 +286,11 @@ describe("grounded resolution", () => {
   it("returns a successful abstention without generation for insufficient retrieval", async () => {
     const llm = provider(replyDecision);
     const noEvidence: EvidenceRetriever = {
-      retrieve: vi.fn().mockRejectedValue(
-        new RetrievalError("insufficient_evidence", "none", { retryable: false }),
-      ),
+      retrieve: vi
+        .fn()
+        .mockRejectedValue(
+          new RetrievalError("insufficient_evidence", "none", { retryable: false }),
+        ),
     };
 
     const result = await resolveTicket(
@@ -341,9 +345,11 @@ describe("grounded resolution", () => {
 
   it("does not mislabel retrieval unavailability as insufficient evidence", async () => {
     const unavailable: EvidenceRetriever = {
-      retrieve: vi.fn().mockRejectedValue(
-        new RetrievalError("unavailable", "database unavailable", { retryable: true }),
-      ),
+      retrieve: vi
+        .fn()
+        .mockRejectedValue(
+          new RetrievalError("unavailable", "database unavailable", { retryable: true }),
+        ),
     };
 
     await expect(

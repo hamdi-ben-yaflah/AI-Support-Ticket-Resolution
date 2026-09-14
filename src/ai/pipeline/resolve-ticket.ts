@@ -18,10 +18,7 @@ import {
 import { AnthropicLlmProvider } from "@/ai/providers/anthropic";
 import type { GenerateRequest, GenerateResult, LlmProvider } from "@/ai/types";
 import { getAiConfig } from "@/config/ai";
-import {
-  getResolutionPolicy,
-  type ResolutionPolicy,
-} from "@/config/resolution";
+import { getResolutionPolicy, type ResolutionPolicy } from "@/config/resolution";
 import { ClassificationSchema, type Classification } from "@/domain/classification";
 import {
   GroundedReplySchema,
@@ -50,8 +47,7 @@ const ResolutionDecisionSchema = z
   .strict()
   .superRefine((decision, context) => {
     if (
-      (decision.action === "reply" ||
-        decision.action === "request_refund_review") &&
+      (decision.action === "reply" || decision.action === "request_refund_review") &&
       decision.groundedReply === null
     ) {
       context.addIssue({
@@ -60,10 +56,7 @@ const ResolutionDecisionSchema = z
         message: "Reply decisions require a grounded reply.",
       });
     }
-    if (
-      decision.action === "needs_human_review" &&
-      decision.groundedReply !== null
-    ) {
+    if (decision.action === "needs_human_review" && decision.groundedReply !== null) {
       context.addIssue({
         code: "custom",
         path: ["groundedReply"],
@@ -90,8 +83,7 @@ type ResolveTicketOptions = ResolutionContext & {
   log?: AppLogger;
 };
 
-const LOW_CONFIDENCE_REASON =
-  "Classification confidence is below the safe automation threshold.";
+const LOW_CONFIDENCE_REASON = "Classification confidence is below the safe automation threshold.";
 const INSUFFICIENT_EVIDENCE_REASON =
   "The knowledge base does not contain enough evidence for a safe reply.";
 
@@ -114,12 +106,9 @@ function createExecutionMetadata(input: {
       : input.classified.metadata.provider,
     model: generated?.model ?? input.classified.metadata.model,
     latencyMs: Math.max(0, Date.now() - input.pipelineStartedAt),
-    inputTokens:
-      input.classified.metadata.inputTokens + (generated?.usage.inputTokens ?? 0),
-    outputTokens:
-      input.classified.metadata.outputTokens + (generated?.usage.outputTokens ?? 0),
-    retryCount:
-      input.classified.metadata.retryCount + (generated?.retryCount ?? 0),
+    inputTokens: input.classified.metadata.inputTokens + (generated?.usage.inputTokens ?? 0),
+    outputTokens: input.classified.metadata.outputTokens + (generated?.usage.outputTokens ?? 0),
+    retryCount: input.classified.metadata.retryCount + (generated?.retryCount ?? 0),
     validationPassed: true,
   };
 }
@@ -225,10 +214,7 @@ function createGeneratedExecution(input: {
     });
   }
 
-  const groundedReply = validateGroundedReply(
-    input.decision.groundedReply,
-    input.evidence,
-  );
+  const groundedReply = validateGroundedReply(input.decision.groundedReply, input.evidence);
   const citedSources = createCitedSources(groundedReply, input.evidence);
 
   if (input.decision.action === "request_refund_review") {
@@ -242,9 +228,7 @@ function createGeneratedExecution(input: {
     const actionArguments = RequestRefundReviewArgsSchema.parse({
       reason: input.decision.reason,
       ticketSummary: input.classification.summary,
-      evidenceChunkIds: groundedReply.citations.map(
-        (citation) => citation.chunkId,
-      ),
+      evidenceChunkIds: groundedReply.citations.map((citation) => citation.chunkId),
     });
     return ResolutionExecutionSchema.parse({
       proposal: ResolutionProposalSchema.parse({
@@ -459,14 +443,10 @@ export async function resolveTicketWithConfiguredProviders(
       try {
         configuredRetriever = createConfiguredEvidenceRetriever();
       } catch (error) {
-        throw new RetrievalError(
-          "unavailable",
-          "Knowledge retrieval is not configured.",
-          {
-            retryable: true,
-            cause: error,
-          },
-        );
+        throw new RetrievalError("unavailable", "Knowledge retrieval is not configured.", {
+          retryable: true,
+          cause: error,
+        });
       }
       return configuredRetriever.retrieve(retrievalInput);
     },

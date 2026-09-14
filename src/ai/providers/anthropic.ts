@@ -177,8 +177,7 @@ export class AnthropicLlmProvider implements LlmProvider {
             output_config: {
               format: zodOutputFormat(request.outputSchema),
             },
-            ...(request.temperature === undefined ||
-            !supportsExplicitTemperature(this.model)
+            ...(request.temperature === undefined || !supportsExplicitTemperature(this.model)
               ? {}
               : { temperature: request.temperature }),
           },
@@ -233,8 +232,7 @@ export class AnthropicLlmProvider implements LlmProvider {
             parsedMessage.data.usage.cache_read_input_tokens === undefined
               ? {}
               : {
-                  cachedInputTokens:
-                    parsedMessage.data.usage.cache_read_input_tokens,
+                  cachedInputTokens: parsedMessage.data.usage.cache_read_input_tokens,
                 }),
           },
           latencyMs: Math.max(0, this.clock.now() - startedAt),

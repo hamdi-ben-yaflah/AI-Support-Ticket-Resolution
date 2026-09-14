@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import { isLiveEvaluationEnabled } from "@/config/deployment";
 import { createApiResultSchema, type ApiResult } from "@/domain/api-result";
 import {
   EvaluationReportSchema,
@@ -20,8 +21,16 @@ type EvaluationRunner = (concurrency: number) => Promise<EvaluationReport>;
 type HandlerDependencies = {
   run?: EvaluationRunner;
   createTraceId?: () => string;
+  isEnabled?: () => boolean;
   log?: AppLogger;
 };
+
+function disabledResponse(): Response {
+  return new Response(null, {
+    status: 404,
+    headers: { "Cache-Control": "private, no-store" },
+  });
+}
 
 function response(
   body: ApiResult<EvaluationReport>,
@@ -46,10 +55,13 @@ function failure(
 export function createEvaluationRunHandler(dependencies: HandlerDependencies = {}) {
   const run = dependencies.run ?? runConfiguredEvaluation;
   const createTraceId = dependencies.createTraceId ?? randomUUID;
+  const isEnabled = dependencies.isEnabled ?? isLiveEvaluationEnabled;
   const log = dependencies.log ?? logger;
   let active = false;
 
   return async function POST(request: Request): Promise<Response> {
+    if (!isEnabled()) return disabledResponse();
+
     const traceId = createTraceId();
     if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
       return failure(

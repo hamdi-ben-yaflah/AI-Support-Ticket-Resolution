@@ -34,7 +34,6 @@ export function getEvaluationPricing(
   if (parsed.data.EVAL_ANTHROPIC_INPUT_USD_PER_MILLION === undefined) return null;
   return {
     inputUsdPerMillion: parsed.data.EVAL_ANTHROPIC_INPUT_USD_PER_MILLION,
-    outputUsdPerMillion:
-      parsed.data.EVAL_ANTHROPIC_OUTPUT_USD_PER_MILLION ?? 0,
+    outputUsdPerMillion: parsed.data.EVAL_ANTHROPIC_OUTPUT_USD_PER_MILLION ?? 0,
   };
 }

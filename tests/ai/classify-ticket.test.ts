@@ -44,7 +44,12 @@ describe("classifyTicket", () => {
       name: "fake",
       model: "fake-model",
       generateStructured: vi.fn().mockResolvedValue({
-        value: { category: "account", priority: "high", summary: "Cannot access account", confidence: 0.91 },
+        value: {
+          category: "account",
+          priority: "high",
+          summary: "Cannot access account",
+          confidence: 0.91,
+        },
         model: "fake-model",
         finishReason: "end_turn",
         usage: { inputTokens: 12, outputTokens: 8 },
@@ -87,7 +92,10 @@ describe("classifyTicket", () => {
     } as unknown as LlmProvider;
 
     await expect(
-      classifyTicket({ text: "A sufficiently long ticket" }, { traceId, provider, log: fakeLogger() }),
+      classifyTicket(
+        { text: "A sufficiently long ticket" },
+        { traceId, provider, log: fakeLogger() },
+      ),
     ).rejects.toMatchObject({ code: "invalid_output" });
   });
 });
