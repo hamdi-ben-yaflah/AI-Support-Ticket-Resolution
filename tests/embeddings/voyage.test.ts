@@ -191,6 +191,60 @@ describe("VoyageEmbeddingProvider", () => {
     expect(JSON.stringify(errorLog.mock.calls)).not.toContain("sensitive SDK detail");
   });
 
+  it("extracts nested provider diagnostics and sanitizes credential-shaped reasons", async () => {
+    const errorLog = vi.fn();
+    const error = new VoyageAIError({
+      statusCode: 429,
+      body: {
+        error: {
+          type: "billing_restricted",
+          message:
+            "Review https://operator:database-password@example.com/billing with key pa-provider-secret",
+        },
+      },
+      rawResponse: new Response(null, {
+        status: 429,
+        headers: {
+          "request-id": "fallback-request-id",
+          "x-ratelimit-limit": "10",
+          "x-ratelimit-remaining": "0",
+          "x-ratelimit-reset": "60s",
+          "x-ratelimit-limit-tokens": "1000",
+          "x-ratelimit-remaining-tokens": "0",
+          "x-ratelimit-reset-tokens": "60s",
+        },
+      }),
+    });
+
+    await expect(
+      provider(vi.fn().mockRejectedValue(error), 2, 0, {
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: errorLog,
+      } as unknown as AppLogger).embed(["input"], {
+        traceId: "trace",
+        operation: "ingestion",
+        inputType: "document",
+      }),
+    ).rejects.toMatchObject({ code: "unavailable" });
+
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        providerError: expect.objectContaining({
+          code: "billing_restricted",
+          reason: "Review https://operator:[REDACTED]@example.com/billing with key [REDACTED]",
+          requestId: "fallback-request-id",
+          rateLimitLimit: "10",
+          rateLimitRemaining: "0",
+          rateLimitReset: "60s",
+          tokenLimit: "1000",
+          tokenRemaining: "0",
+          tokenReset: "60s",
+        }),
+      }),
+    );
+  });
+
   it("retries transient failures within the deadline", async () => {
     const embed = vi
       .fn()
