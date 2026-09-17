@@ -16,14 +16,14 @@ Bring every currently open pull request in `hamdi-ben-yaflah/AI-Support-Ticket-R
 
 1. Update `.github/dependabot.yml` so the npm group explicitly groups only minor and patch updates, and ignores major updates for `typescript` and `@types/node` until the runtime/tooling support is intentionally upgraded. Leave the GitHub Actions, Docker, and dependency-review workflows intact.
 2. Refresh/rebase PR #1 and PR #4 onto the latest `main`, preserving their intended one-purpose dependency changes. Do not rewrite their unrelated content.
-3. Refresh PR #3 onto the latest `main`, keep its compatible dependency updates, and restore the supported toolchain majors (`typescript` 5.x, `@types/node` 24.x). Regenerate only the lockfile metadata required by that manifest change.
+3. Do not downgrade dependencies. Treat PR #3 as superseded because its TypeScript 7 upgrade is newer than the currently supported lint toolchain (the latest `typescript-eslint` still requires TypeScript `<6.1.0`). Close that obsolete PR and create a replacement from the latest `main` containing only compatible latest updates; leave the existing TypeScript 5.x and Node 24 type baselines unchanged until the ecosystem supports TypeScript 7.
 4. Rerun all PR checks and inspect failed-step logs. If a check exposes a new, reproducible defect introduced by these dependency updates, make the smallest scoped correction and update this plan before expanding scope.
 
 ## Verification and acceptance
 
 - Run locally: `pnpm verify`.
 - For database-affecting checks, run `pnpm test:integration` with the repository’s configured PostgreSQL service when available.
-- Confirm PR #1, #3, and #4 each have successful Quality, PostgreSQL integration, dependency review, CodeQL, and container checks; confirm publish/deploy remain skipped on pull requests.
+- Confirm PR #1, #4, and the replacement dependency PR each have successful Quality, PostgreSQL integration, dependency review, CodeQL, and container checks; confirm publish/deploy remain skipped on pull requests. Confirm obsolete PR #3 is closed with a replacement link.
 - Confirm `git diff` contains only the Dependabot policy/lockfile changes intended by this plan and no raw secrets or unrelated application changes.
 - Report exact commands, CI run URLs/results, and any manual GitHub steps required for branch refresh or re-running checks.
 
@@ -31,4 +31,4 @@ Bring every currently open pull request in `hamdi-ben-yaflah/AI-Support-Ticket-R
 
 - No application behavior, API contract, database schema, prompt, provider, or deployment changes.
 - No removal, softening, or `continue-on-error` workaround for security checks.
-- No automatic merge, production deployment, or closure of an open PR unless a superseding PR is explicitly created and the original is demonstrably obsolete.
+- No automatic merge or production deployment. Close PR #3 only after the replacement dependency PR is created and linked.
