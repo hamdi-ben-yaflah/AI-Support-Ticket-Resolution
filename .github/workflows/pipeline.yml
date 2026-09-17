@@ -26,7 +26,6 @@ jobs:
       contents: read
     env:
       APP_VERSION: ${{ github.sha }}
-      ENABLE_LIVE_EVALUATIONS: "false"
     steps:
       - name: Check out source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -54,10 +53,14 @@ jobs:
       - name: Check committed migrations
         run: pnpm db:check
       - name: Run deterministic tests with coverage
+        env:
+          ENABLE_LIVE_EVALUATIONS: "true"
         run: pnpm test:coverage
       - name: Build deployment operations
         run: pnpm build:operations
       - name: Build Next.js
+        env:
+          ENABLE_LIVE_EVALUATIONS: "false"
         run: pnpm build
       - name: Audit production dependencies
         run: pnpm audit --prod --audit-level high
