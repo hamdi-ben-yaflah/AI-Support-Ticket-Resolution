@@ -33,6 +33,10 @@ LABEL org.opencontainers.image.source=${OCI_SOURCE} \
       org.opencontainers.image.revision=${OCI_REVISION}
 
 WORKDIR /app
+RUN apt-get update && \
+    apt-get install --only-upgrade --yes --no-install-recommends libpcre2-8-0 && \
+    rm -rf /var/lib/apt/lists/* /usr/local/lib/node_modules/npm && \
+    rm -f /usr/local/bin/npm /usr/local/bin/npx
 ENV APP_VERSION=${APP_VERSION} \
     ENABLE_LIVE_EVALUATIONS=false \
     HOSTNAME=0.0.0.0 \
