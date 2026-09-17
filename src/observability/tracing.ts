@@ -55,6 +55,7 @@ export type SafeTraceAttributes = {
   "support.usage.cache_write_tokens"?: number;
   "support.provider.request_id"?: string;
   "support.provider.message_id"?: string;
+  "support.provider.status_code"?: number;
   "support.finish_reason"?: string;
   "support.attempt"?: number;
   "support.retry_count"?: number;

@@ -163,6 +163,7 @@ export async function classifyTicketWithMetadata(
           "support.validation.outcome": "invalid",
           "support.retry_count": llmError.retryCount,
           "support.provider.request_id": llmError.providerRequestId,
+          "support.provider.status_code": llmError.providerStatusCode,
           "support.outcome": "failed",
         });
         span.fail(llmError.code);
@@ -179,6 +180,8 @@ export async function classifyTicketWithMetadata(
               outputTokens: 0,
               latencyMs: Math.max(0, Date.now() - startedAt),
               finishReason: llmError.finishReason ?? llmError.code,
+              providerStatusCode: llmError.providerStatusCode,
+              providerErrorType: llmError.providerErrorType,
               validationPassed: false,
               retryCount: llmError.retryCount,
             },

@@ -413,6 +413,7 @@ export async function resolveTicket(
             "support.validation.outcome": "provider_error",
             "support.retry_count": mapped.retryCount,
             "support.provider.request_id": mapped.providerRequestId,
+            "support.provider.status_code": mapped.providerStatusCode,
             "support.outcome": "failed",
           });
           span.fail(mapped.code);
@@ -440,6 +441,8 @@ export async function resolveTicket(
           outputTokens: 0,
           latencyMs: Math.max(0, Date.now() - startedAt),
           finishReason: mapped.finishReason ?? mapped.code,
+          providerStatusCode: mapped.providerStatusCode,
+          providerErrorType: mapped.providerErrorType,
           validationPassed: false,
           retryCount: mapped.retryCount,
           evidenceCount: evidence.length,
