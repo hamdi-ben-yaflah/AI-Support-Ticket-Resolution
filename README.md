@@ -58,6 +58,30 @@ checks.
 
 Open [http://localhost:3000](http://localhost:3000). Use synthetic tickets only; ticket text is sent to Anthropic for classification and, when confidence and retrieval permit, grounded resolution. It is never written to application telemetry or storage. Successful runs retain only a keyed ticket hash, redacted model metadata, the validated classification/action, and immutable snapshots of cited chunks for grounded outcomes. Refund-review outcomes atomically add an opaque `pending_confirmation` audit row. Successful abstentions retain no cited-source rows.
 
+## V2 deterministic tool foundation
+
+The first V2 milestone adds a server-only, application-owned catalog containing exactly
+`searchKnowledge`, `getCustomerProfile`, `getInvoices`, `getSubscription`, and
+`getServiceStatus`. Every request and minimized result has a strict bounded schema; structured
+lookups require an exact identifier found in the submitted ticket or a validated result from the
+same run. The dispatcher applies a per-tool deadline (`INVESTIGATION_TOOL_TIMEOUT_MS`, 3,000 ms by
+default and at most 10,000 ms), propagates cancellation, and keeps identifier-bearing evidence
+keys out of telemetry metadata.
+
+Customer, invoice, subscription, and service records come only from the reviewable
+`synthetic-sources.v1` fixtures in `data/synthetic-sources/v1/`. They are fictional, read only,
+validated on load, and explicitly mapped to display-safe fields. Knowledge search reuses the
+existing retrieval boundary. The catalog, schemas, and fixtures are independently versioned as
+`tool-catalog.v1`, `tool-schema.v1`, and `synthetic-sources.v1`.
+
+This foundation is intentionally not connected to `POST /api/tickets/resolve` or the UI. The
+implemented V1 flow remains active until a separately approved V2 bounded-investigation milestone
+adds the loop, persistence, and terminal result. Run the deterministic foundation coverage with:
+
+```bash
+pnpm vitest run tests/config/investigation.test.ts tests/investigation
+```
+
 ## Evaluation suite
 
 The committed `data/evals/golden.jsonl` is `golden.v2` and contains 36 unique synthetic cases across normal, edge, adversarial, ambiguous, contradictory, action-ready, and unanswerable scenarios. It includes a policy-complete refund-review case and a confirmation-bypass attempt. Every case declares a stable ID, dataset version, ticket input, expected category, allowed priorities/actions, relevant source IDs, abstention label, and tags. Loading fails before provider work for malformed JSONL, blank lines, duplicates, mixed versions, or a case count outside 30–50.
@@ -144,6 +168,7 @@ Follow [docs/operations/first-production-deploy.md](docs/operations/first-produc
 - `src/embeddings`: provider-neutral embedding contract and server-only Voyage AI adapter with deadlines, retries, finite-vector/dimension validation, and redacted telemetry
 - `src/ingestion`: front-matter parsing, Markdown AST semantic sectioning, token-aware chunking, deterministic hashes/indexes, idempotent ingestion, and the validated chunk-inspection output contract
 - `src/retrieval`: category-first cosine retrieval, safe broad fallback, thresholds, deduplication, context budgets, and untrusted evidence delimiters
+- `src/investigation`: V2 versioned synthetic fixture validation, exact identifier provenance, five-tool read-only catalog, display-safe result mapping, and bounded cancellation-aware dispatch
 - `src/evals`: strict golden/report/history/comparison contracts, versioned dataset loading, deterministic graders and run comparison, advisory citation judging, bounded shared runner, thresholds, safe persistence mapping, and live service composition
 - `src/db`: Drizzle schema, PostgreSQL client, migration-backed persistence, cosine search, document replacement, deterministic chunk inspection, successful resolution/cited-source/pending-action transactions, row-locked idempotent mock confirmation, and transactional evaluation run/case history
 - `src/config`: lazy server-only environment validation
