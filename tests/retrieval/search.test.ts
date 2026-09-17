@@ -92,6 +92,20 @@ describe("retrieval", () => {
     );
   });
 
+  it("searches all categories directly when no category is supplied", async () => {
+    const search = vi.fn().mockResolvedValue([candidate(0, 0.9)]);
+    await expect(
+      retrieveEvidence(
+        { text: "refund policy", traceId: "trace" },
+        { embedder, search, config, log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } },
+      ),
+    ).resolves.toHaveLength(1);
+    expect(search).toHaveBeenCalledOnce();
+    expect(search).toHaveBeenCalledWith(
+      expect.not.objectContaining({ category: expect.anything() }),
+    );
+  });
+
   it("returns controlled insufficient evidence and unavailable failures", async () => {
     const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
     await expect(

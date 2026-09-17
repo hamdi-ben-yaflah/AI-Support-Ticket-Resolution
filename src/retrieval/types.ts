@@ -24,7 +24,8 @@ export type RetrievalCandidate = z.infer<typeof RetrievalCandidateSchema>;
 export interface EvidenceRetriever {
   retrieve(input: {
     text: string;
-    category: string;
+    category?: string;
     traceId: string;
+    signal?: AbortSignal;
   }): Promise<RetrievedEvidence[]>;
 }
