@@ -219,15 +219,15 @@ export class AnthropicLlmProvider implements LlmProvider {
             timeout: attemptTimeoutMs,
           },
         );
-        const response = await pending.withResponse();
-        const message = response.data;
+        const message = await pending;
+        const providerRequestId = message._request_id ?? undefined;
 
         const parsedMessage = AnthropicMessageSchema.safeParse(message);
         if (!parsedMessage.success) {
           throw new LlmError("invalid_output", "The model returned an invalid response.", {
             retryable: false,
             retryCount,
-            providerRequestId: response.request_id ?? undefined,
+            providerRequestId,
           });
         }
 
@@ -237,7 +237,7 @@ export class AnthropicLlmProvider implements LlmProvider {
             retryable: false,
             retryCount,
             finishReason,
-            providerRequestId: response.request_id ?? undefined,
+            providerRequestId,
           });
         }
 
@@ -246,7 +246,7 @@ export class AnthropicLlmProvider implements LlmProvider {
             retryable: false,
             retryCount,
             finishReason,
-            providerRequestId: response.request_id ?? undefined,
+            providerRequestId,
           });
         }
 
@@ -256,14 +256,14 @@ export class AnthropicLlmProvider implements LlmProvider {
             retryable: false,
             retryCount,
             finishReason,
-            providerRequestId: response.request_id ?? undefined,
+            providerRequestId,
           });
         }
 
         this.tracing.getActiveSpan()?.setAttributes({
           "support.provider_attempt_duration_ms": Math.max(0, this.clock.now() - attemptStartedAt),
           "support.attempt": retryCount + 1,
-          "support.provider.request_id": response.request_id ?? undefined,
+          "support.provider.request_id": providerRequestId,
           "support.provider.message_id": parsedMessage.data.id,
         });
         return {
@@ -288,7 +288,7 @@ export class AnthropicLlmProvider implements LlmProvider {
           },
           latencyMs: Math.max(0, this.clock.now() - startedAt),
           retryCount,
-          ...(response.request_id ? { providerRequestId: response.request_id } : {}),
+          ...(providerRequestId ? { providerRequestId } : {}),
           providerMessageId: parsedMessage.data.id,
         };
       } catch (error) {

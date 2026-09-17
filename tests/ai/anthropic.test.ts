@@ -59,13 +59,11 @@ function provider(
 ) {
   const client = {
     messages: {
-      parse: (...arguments_: unknown[]) => ({
-        withResponse: async () => ({
-          data: await (parse as (...arguments_: unknown[]) => Promise<unknown>)(...arguments_),
-          response: new Response(null, { headers: { "request-id": "req_1" } }),
-          request_id: "req_1",
-          workspace_id: undefined,
-        }),
+      parse: async (...arguments_: unknown[]) => ({
+        ...((await (parse as (...arguments_: unknown[]) => Promise<unknown>)(
+          ...arguments_,
+        )) as Record<string, unknown>),
+        _request_id: "req_1",
       }),
     },
   } as unknown as Anthropic;
