@@ -6,6 +6,8 @@ import { createResolutionRequest } from "@/ai/pipeline/resolve-ticket";
 import { AnthropicLlmProvider } from "@/ai/providers/anthropic";
 import type { GenerateRequest } from "@/ai/types";
 import { ClassificationSchema, type Classification } from "@/domain/classification";
+import { InMemoryTracing } from "@/observability/testing";
+import type { AppTracing } from "@/observability/tracing";
 
 const request: GenerateRequest<Classification> = {
   task: "classification",
@@ -53,8 +55,18 @@ function provider(
     sleep: vi.fn().mockResolvedValue(undefined),
     random: () => 0,
   },
+  tracing?: AppTracing,
 ) {
-  const client = { messages: { parse } } as unknown as Anthropic;
+  const client = {
+    messages: {
+      parse: async (...arguments_: unknown[]) => ({
+        ...((await (parse as (...arguments_: unknown[]) => Promise<unknown>)(
+          ...arguments_,
+        )) as Record<string, unknown>),
+        _request_id: "req_1",
+      }),
+    },
+  } as unknown as Anthropic;
   return new AnthropicLlmProvider({
     apiKey: "test-key",
     model,
@@ -62,6 +74,7 @@ function provider(
     maxRetries,
     client,
     clock,
+    tracing,
   });
 }
 
@@ -72,7 +85,8 @@ describe("AnthropicLlmProvider", () => {
 
     expect(result.value.category).toBe("billing");
     expect(result.usage).toEqual({ inputTokens: 20, outputTokens: 12, cachedInputTokens: 2 });
-    expect(result.providerRequestId).toBe("msg_1");
+    expect(result.providerRequestId).toBe("req_1");
+    expect(result.providerMessageId).toBe("msg_1");
     expect(parse).toHaveBeenCalledOnce();
     expect(parse.mock.calls[0]?.[0]).toMatchObject({
       model: "claude-sonnet-5",
@@ -161,13 +175,27 @@ describe("AnthropicLlmProvider", () => {
   });
 
   it("retries transient connections within the configured cap", async () => {
+    const tracing = new InMemoryTracing();
     const parse = vi
       .fn()
       .mockRejectedValueOnce(new APIConnectionError({ message: "offline" }))
       .mockResolvedValueOnce(message());
-    const result = await provider(parse).generateStructured(request);
+    const result = await tracing.withSpan("support.ai.classification", {}, () =>
+      provider(parse, 2, "claude-sonnet-5", undefined, tracing).generateStructured(request),
+    );
     expect(result.retryCount).toBe(1);
     expect(parse).toHaveBeenCalledTimes(2);
+    expect(tracing.spans[0]?.events).toEqual([
+      {
+        name: "support.retry",
+        attributes: {
+          attempt: 1,
+          retryCount: 1,
+          delayMs: 187.5,
+          errorCode: "unavailable",
+        },
+      },
+    ]);
   });
 
   it("uses only the remaining operation deadline for a transient retry", async () => {

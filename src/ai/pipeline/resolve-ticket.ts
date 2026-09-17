@@ -34,6 +34,7 @@ import {
 } from "@/domain/resolution-run";
 import type { TicketInput } from "@/domain/ticket";
 import { createLogger, logger, type AppLogger } from "@/observability/logger";
+import { tracing, withTraceCorrelation, type AppTracing } from "@/observability/tracing";
 import { isRetrievalError, RetrievalError } from "@/retrieval/errors";
 import { createConfiguredEvidenceRetriever } from "@/retrieval/search";
 import type { EvidenceRetriever, RetrievedEvidence } from "@/retrieval/types";
@@ -81,6 +82,7 @@ type ResolveTicketOptions = ResolutionContext & {
   policy: ResolutionPolicy;
   createProposalId?: () => string;
   log?: AppLogger;
+  tracing?: AppTracing;
 };
 
 const LOW_CONFIDENCE_REASON = "Classification confidence is below the safe automation threshold.";
@@ -268,15 +270,28 @@ function logAbstention(
     classification: Classification;
     policy: ResolutionPolicy;
   },
+  appTracing: AppTracing = tracing,
 ) {
-  log.info({
-    event: "resolution_abstained",
-    traceId: input.traceId,
-    reasonCode: input.reasonCode,
-    classificationConfidence: input.classification.confidence,
-    minimumConfidence: input.policy.minimumConfidence,
-    resolutionPolicyVersion: input.policy.version,
+  appTracing.getActiveSpan()?.setAttributes({
+    "support.abstention.reason_code": input.reasonCode,
+    "support.action": "needs_human_review",
+    "support.category": input.classification.category,
+    "support.priority": input.classification.priority,
+    "support.confidence": input.classification.confidence,
   });
+  log.info(
+    withTraceCorrelation(
+      {
+        event: "resolution_abstained",
+        traceId: input.traceId,
+        reasonCode: input.reasonCode,
+        classificationConfidence: input.classification.confidence,
+        minimumConfidence: input.policy.minimumConfidence,
+        resolutionPolicyVersion: input.policy.version,
+      },
+      appTracing,
+    ),
+  );
 }
 
 export async function resolveTicket(
@@ -284,6 +299,7 @@ export async function resolveTicket(
   options: ResolveTicketOptions,
 ): Promise<ResolutionExecution> {
   const log = options.log ?? logger;
+  const appTracing = options.tracing ?? tracing;
   const pipelineStartedAt = Date.now();
   const classified = await options.classifier(input, { traceId: options.traceId });
   const classification = ClassificationSchema.parse(classified.classification);
@@ -296,12 +312,16 @@ export async function resolveTicket(
       reason: LOW_CONFIDENCE_REASON,
       pipelineStartedAt,
     });
-    logAbstention(log, {
-      traceId: options.traceId,
-      reasonCode: "low_confidence",
-      classification,
-      policy: options.policy,
-    });
+    logAbstention(
+      log,
+      {
+        traceId: options.traceId,
+        reasonCode: "low_confidence",
+        classification,
+        policy: options.policy,
+      },
+      appTracing,
+    );
     return execution;
   }
 
@@ -324,64 +344,195 @@ export async function resolveTicket(
       reason: INSUFFICIENT_EVIDENCE_REASON,
       pipelineStartedAt,
     });
-    logAbstention(log, {
-      traceId: options.traceId,
-      reasonCode: "insufficient_evidence",
-      classification,
-      policy: options.policy,
-    });
+    logAbstention(
+      log,
+      {
+        traceId: options.traceId,
+        reasonCode: "insufficient_evidence",
+        classification,
+        policy: options.policy,
+      },
+      appTracing,
+    );
     return execution;
   }
 
   const startedAt = Date.now();
+  let generated: GenerateResult<ResolutionDecision>;
+  try {
+    generated = await appTracing.withSpan(
+      "support.ai.resolution",
+      {
+        attributes: {
+          "support.trace_id": options.traceId,
+          "support.task": "resolution",
+          "support.prompt.version": RESOLUTION_PROMPT_VERSION,
+          "support.policy.version": options.policy.version,
+          "gen_ai.provider.name": options.provider.name,
+          "gen_ai.request.model": options.provider.model,
+        },
+      },
+      async (span) => {
+        try {
+          const result = await options.provider.generateStructured(
+            createResolutionRequest({
+              ticket: input,
+              classification,
+              evidence,
+              traceId: options.traceId,
+            }),
+          );
+          span.setAttributes({
+            "gen_ai.response.model": result.model,
+            "gen_ai.usage.input_tokens": result.usage.inputTokens,
+            "gen_ai.usage.output_tokens": result.usage.outputTokens,
+            "support.usage.cached_input_tokens": result.usage.cachedInputTokens,
+            "support.usage.cache_write_tokens": result.usage.cacheWriteInputTokens,
+            "support.provider.request_id": result.providerRequestId,
+            "support.provider.message_id": result.providerMessageId,
+            "support.finish_reason": result.finishReason,
+            "support.duration_ms": result.latencyMs,
+            "support.retry_count": result.retryCount,
+            "support.validation.passed": true,
+            "support.validation.outcome": "provider_schema_valid",
+            "support.action": result.value.action,
+            "support.outcome": "completed",
+          });
+          return result;
+        } catch (error) {
+          const mapped = isLlmError(error)
+            ? error
+            : new LlmError("unexpected", "Grounded resolution generation failed.", {
+                retryable: false,
+                cause: error,
+              });
+          span.setAttributes({
+            "support.duration_ms": Math.max(0, Date.now() - startedAt),
+            "support.finish_reason": mapped.finishReason ?? mapped.code,
+            "support.validation.passed": false,
+            "support.validation.outcome": "provider_error",
+            "support.retry_count": mapped.retryCount,
+            "support.provider.request_id": mapped.providerRequestId,
+            "support.provider.status_code": mapped.providerStatusCode,
+            "support.outcome": "failed",
+          });
+          span.fail(mapped.code);
+          throw mapped;
+        }
+      },
+    );
+  } catch (error) {
+    const mapped = isLlmError(error)
+      ? error
+      : new LlmError("unexpected", "Grounded resolution generation failed.", {
+          retryable: false,
+          cause: error,
+        });
+    log.error(
+      withTraceCorrelation(
+        {
+          event: "model_call",
+          traceId: options.traceId,
+          task: "resolution",
+          provider: options.provider.name,
+          model: options.provider.model,
+          promptVersion: RESOLUTION_PROMPT_VERSION,
+          inputTokens: 0,
+          outputTokens: 0,
+          latencyMs: Math.max(0, Date.now() - startedAt),
+          finishReason: mapped.finishReason ?? mapped.code,
+          providerStatusCode: mapped.providerStatusCode,
+          providerErrorType: mapped.providerErrorType,
+          validationPassed: false,
+          retryCount: mapped.retryCount,
+          evidenceCount: evidence.length,
+        },
+        appTracing,
+      ),
+    );
+    throw mapped;
+  }
 
   try {
-    const generated = await options.provider.generateStructured(
-      createResolutionRequest({
-        ticket: input,
-        classification,
-        evidence,
-        traceId: options.traceId,
-      }),
+    const execution = await appTracing.withSpan(
+      "support.grounding.validate",
+      {
+        attributes: {
+          "support.trace_id": options.traceId,
+          "support.operation": "grounding_validation",
+          "support.policy.version": options.policy.version,
+          "support.citation_count": generated.value.groundedReply?.citations.length ?? 0,
+        },
+      },
+      async (span) => {
+        try {
+          const result = createGeneratedExecution({
+            classification,
+            classified,
+            decision: generated.value,
+            generated,
+            evidence,
+            policy: options.policy,
+            provider: options.provider,
+            pipelineStartedAt,
+            createProposalId: options.createProposalId ?? randomUUID,
+          });
+          span.setAttributes({
+            "support.validation.passed": true,
+            "support.validation.outcome":
+              result.proposal.action === "needs_human_review" ? "not_applicable" : "grounded",
+            "support.action": result.proposal.action,
+            "support.citation_count": result.citedSources.length,
+            "support.outcome": "completed",
+          });
+          return result;
+        } catch (error) {
+          span.setAttributes({
+            "support.validation.passed": false,
+            "support.validation.outcome": "invalid",
+            "support.outcome": "failed",
+          });
+          span.fail("invalid_output");
+          throw error;
+        }
+      },
     );
 
-    const execution = createGeneratedExecution({
-      classification,
-      classified,
-      decision: generated.value,
-      generated,
-      evidence,
-      policy: options.policy,
-      provider: options.provider,
-      pipelineStartedAt,
-      createProposalId: options.createProposalId ?? randomUUID,
-    });
-
-    log.info({
-      event: "model_call",
-      traceId: options.traceId,
-      task: "resolution",
-      provider: options.provider.name,
-      model: generated.model,
-      promptVersion: RESOLUTION_PROMPT_VERSION,
-      providerRequestId: generated.providerRequestId,
-      inputTokens: generated.usage.inputTokens,
-      outputTokens: generated.usage.outputTokens,
-      cachedInputTokens: generated.usage.cachedInputTokens,
-      latencyMs: generated.latencyMs,
-      finishReason: generated.finishReason,
-      validationPassed: true,
-      retryCount: generated.retryCount,
-      evidenceCount: evidence.length,
-      action: generated.value.action,
-    });
+    log.info(
+      withTraceCorrelation(
+        {
+          event: "model_call",
+          traceId: options.traceId,
+          task: "resolution",
+          provider: options.provider.name,
+          model: generated.model,
+          promptVersion: RESOLUTION_PROMPT_VERSION,
+          providerRequestId: generated.providerRequestId,
+          providerMessageId: generated.providerMessageId,
+          inputTokens: generated.usage.inputTokens,
+          outputTokens: generated.usage.outputTokens,
+          cachedInputTokens: generated.usage.cachedInputTokens,
+          latencyMs: generated.latencyMs,
+          finishReason: generated.finishReason,
+          validationPassed: true,
+          retryCount: generated.retryCount,
+          evidenceCount: evidence.length,
+          action: generated.value.action,
+        },
+        appTracing,
+      ),
+    );
     if (execution.proposal.action === "needs_human_review") {
-      logAbstention(log, {
-        traceId: options.traceId,
-        reasonCode: "model_selected",
-        classification,
-        policy: options.policy,
-      });
+      logAbstention(
+        log,
+        {
+          traceId: options.traceId,
+          reasonCode: "model_selected",
+          classification,
+          policy: options.policy,
+        },
+        appTracing,
+      );
     }
     return execution;
   } catch (error) {
@@ -396,21 +547,26 @@ export async function resolveTicket(
             retryable: false,
             cause: error,
           });
-    log.error({
-      event: "model_call",
-      traceId: options.traceId,
-      task: "resolution",
-      provider: options.provider.name,
-      model: options.provider.model,
-      promptVersion: RESOLUTION_PROMPT_VERSION,
-      inputTokens: 0,
-      outputTokens: 0,
-      latencyMs: Math.max(0, Date.now() - startedAt),
-      finishReason: mapped.finishReason ?? mapped.code,
-      validationPassed: false,
-      retryCount: mapped.retryCount,
-      evidenceCount: evidence.length,
-    });
+    log.error(
+      withTraceCorrelation(
+        {
+          event: "model_call",
+          traceId: options.traceId,
+          task: "resolution",
+          provider: options.provider.name,
+          model: options.provider.model,
+          promptVersion: RESOLUTION_PROMPT_VERSION,
+          inputTokens: 0,
+          outputTokens: 0,
+          latencyMs: Math.max(0, Date.now() - startedAt),
+          finishReason: mapped.finishReason ?? mapped.code,
+          validationPassed: false,
+          retryCount: mapped.retryCount,
+          evidenceCount: evidence.length,
+        },
+        appTracing,
+      ),
+    );
     throw mapped;
   }
 }
@@ -436,6 +592,7 @@ export async function resolveTicketWithConfiguredProviders(
     model: config.model,
     timeoutMs: config.requestTimeoutMs,
     maxRetries: config.maxRetries,
+    tracing,
   });
   const retriever: EvidenceRetriever = {
     retrieve: async (retrievalInput) => {
@@ -462,7 +619,9 @@ export async function resolveTicketWithConfiguredProviders(
         ...classificationContext,
         provider,
         log,
+        tracing,
       }),
     log,
+    tracing,
   });
 }

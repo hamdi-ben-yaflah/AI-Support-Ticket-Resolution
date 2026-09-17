@@ -23,10 +23,12 @@ export type GenerateResult<T> = {
     inputTokens: number;
     outputTokens: number;
     cachedInputTokens?: number;
+    cacheWriteInputTokens?: number;
   };
   latencyMs: number;
   retryCount: number;
   providerRequestId?: string;
+  providerMessageId?: string;
 };
 
 export interface LlmProvider {

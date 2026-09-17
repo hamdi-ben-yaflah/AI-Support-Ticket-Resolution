@@ -16,6 +16,12 @@ import type { PersistedResolutionRun, ResolutionExecution } from "@/domain/resol
 import { ResolutionExecutionSchema } from "@/domain/resolution-run";
 import { TicketInputSchema, type TicketInput } from "@/domain/ticket";
 import { logger, type AppLogger } from "@/observability/logger";
+import {
+  tracing,
+  withTraceCorrelation,
+  type AppTracing,
+  type NormalizedTraceErrorCode,
+} from "@/observability/tracing";
 import { isRetrievalError } from "@/retrieval/errors";
 
 type Resolver = (input: TicketInput, context: ResolutionContext) => Promise<ResolutionExecution>;
@@ -26,6 +32,7 @@ type HandlerDependencies = {
   persist?: (run: PersistedResolutionRun) => Promise<void>;
   createTraceId?: () => string;
   log?: AppLogger;
+  tracing?: AppTracing;
 };
 
 type ErrorResponse = {
@@ -148,95 +155,203 @@ function mapResolutionError(error: unknown): ErrorResponse {
   }
 }
 
+function normalizedTraceError(code: ApiErrorCode): NormalizedTraceErrorCode {
+  switch (code) {
+    case "invalid_request":
+      return "invalid_input";
+    case "provider_timeout":
+      return "timeout";
+    case "provider_unavailable":
+      return "unavailable";
+    case "retrieval_unavailable":
+      return "retrieval_unavailable";
+    case "model_refused":
+      return "refused";
+    case "model_truncated":
+      return "truncated";
+    case "model_output_invalid":
+      return "invalid_output";
+    case "configuration_error":
+      return "configuration";
+    default:
+      return "internal_error";
+  }
+}
+
 export function createResolveHandler(dependencies: HandlerDependencies = {}) {
   const resolve = dependencies.resolve ?? resolveTicketWithConfiguredProviders;
   const createSession = dependencies.createSession ?? getOrCreateResolutionSession;
   const persist = dependencies.persist ?? persistSuccessfulResolution;
   const createTraceId = dependencies.createTraceId ?? randomUUID;
   const log = dependencies.log ?? logger;
+  const appTracing = dependencies.tracing ?? tracing;
 
   return async function POST(request: Request): Promise<Response> {
     const traceId = createTraceId();
-    let body: unknown;
+    const startedAt = Date.now();
+    return appTracing.withSpan(
+      "support.ticket.resolve",
+      { root: true, attributes: { "support.trace_id": traceId, "support.task": "resolve" } },
+      async (rootSpan) => {
+        let body: unknown;
 
-    try {
-      body = await request.json();
-    } catch {
-      log.warn({ event: "resolve_request_rejected", traceId, reason: "malformed_json" });
-      return failure(traceId, {
-        status: 400,
-        code: "invalid_request",
-        message: "Request body must be valid JSON.",
-        retryable: false,
-      });
-    }
+        try {
+          body = await request.json();
+        } catch {
+          rootSpan.setAttributes({
+            "support.api.result_code": "invalid_request",
+            "support.retryable": false,
+            "support.outcome": "rejected",
+            "support.duration_ms": Math.max(0, Date.now() - startedAt),
+          });
+          rootSpan.fail("invalid_json");
+          log.warn(
+            withTraceCorrelation(
+              {
+                event: "resolve_request_rejected",
+                traceId,
+                reason: "malformed_json",
+              },
+              appTracing,
+            ),
+          );
+          return failure(traceId, {
+            status: 400,
+            code: "invalid_request",
+            message: "Request body must be valid JSON.",
+            retryable: false,
+          });
+        }
 
-    const input = TicketInputSchema.safeParse(body);
-    if (!input.success) {
-      log.warn({ event: "resolve_request_rejected", traceId, reason: "invalid_input" });
-      return failure(traceId, {
-        status: 400,
-        code: "invalid_request",
-        message: "Enter 10 to 10,000 characters and use a supported customer tier.",
-        retryable: false,
-      });
-    }
+        const input = TicketInputSchema.safeParse(body);
+        if (!input.success) {
+          rootSpan.setAttributes({
+            "support.api.result_code": "invalid_request",
+            "support.retryable": false,
+            "support.outcome": "rejected",
+            "support.duration_ms": Math.max(0, Date.now() - startedAt),
+          });
+          rootSpan.fail("invalid_input");
+          log.warn(
+            withTraceCorrelation(
+              {
+                event: "resolve_request_rejected",
+                traceId,
+                reason: "invalid_input",
+              },
+              appTracing,
+            ),
+          );
+          return failure(traceId, {
+            status: 400,
+            code: "invalid_request",
+            message: "Enter 10 to 10,000 characters and use a supported customer tier.",
+            retryable: false,
+          });
+        }
 
-    try {
-      const session = createSession(request, input.data.text);
-      const execution = ResolutionExecutionSchema.parse(await resolve(input.data, { traceId }));
-      try {
-        await persist({
-          traceId,
-          sessionHash: session.sessionHash,
-          ticketHash: session.ticketHash,
-          classification: {
-            category: execution.proposal.category,
-            priority: execution.proposal.priority,
-            summary: execution.proposal.summary,
-            confidence: execution.proposal.confidence,
-          },
-          action:
-            execution.proposal.action === "request_refund_review"
-              ? {
-                  type: execution.proposal.action,
-                  reason: execution.proposal.reason,
-                  proposal: execution.proposal.actionProposal,
-                }
-              : {
-                  type: execution.proposal.action,
-                  reason: execution.proposal.reason,
-                },
-          citedSources: execution.citedSources,
-          metadata: execution.metadata,
-        });
-      } catch (error) {
-        throw new ResolutionPersistenceError(error);
-      }
-      const result: ApiResult<ResolutionProposal> = {
-        ok: true,
-        traceId,
-        data: execution.proposal,
-      };
+        try {
+          const session = createSession(request, input.data.text);
+          const execution = ResolutionExecutionSchema.parse(await resolve(input.data, { traceId }));
+          await appTracing.withSpan(
+            "support.resolution.persist",
+            {
+              attributes: {
+                "support.trace_id": traceId,
+                "support.operation": "resolution_persistence",
+              },
+            },
+            async (span) => {
+              try {
+                await persist({
+                  traceId,
+                  sessionHash: session.sessionHash,
+                  ticketHash: session.ticketHash,
+                  classification: {
+                    category: execution.proposal.category,
+                    priority: execution.proposal.priority,
+                    summary: execution.proposal.summary,
+                    confidence: execution.proposal.confidence,
+                  },
+                  action:
+                    execution.proposal.action === "request_refund_review"
+                      ? {
+                          type: execution.proposal.action,
+                          reason: execution.proposal.reason,
+                          proposal: execution.proposal.actionProposal,
+                        }
+                      : {
+                          type: execution.proposal.action,
+                          reason: execution.proposal.reason,
+                        },
+                  citedSources: execution.citedSources,
+                  metadata: execution.metadata,
+                });
+                span.setAttributes({
+                  "support.persistence.outcome": "persisted",
+                  "support.outcome": "completed",
+                });
+              } catch (error) {
+                span.setAttributes({
+                  "support.persistence.outcome": "failed",
+                  "support.outcome": "failed",
+                });
+                span.fail("persistence_error");
+                throw new ResolutionPersistenceError(error);
+              }
+            },
+          );
+          const result: ApiResult<ResolutionProposal> = {
+            ok: true,
+            traceId,
+            data: execution.proposal,
+          };
 
-      log.info({ event: "resolve_request_completed", traceId });
-      const response = NextResponse.json(ResolutionApiResultSchema.parse(result), {
-        status: 200,
-      });
-      if (session.cookie) {
-        response.cookies.set(session.cookie.name, session.cookie.value, session.cookie.options);
-      }
-      return response;
-    } catch (error) {
-      const responseError = mapResolutionError(error);
-      log.error({
-        event: "resolve_request_failed",
-        traceId,
-        code: responseError.code,
-        retryable: responseError.retryable,
-      });
-      return failure(traceId, responseError);
-    }
+          rootSpan.setAttributes({
+            "support.api.result_code": "success",
+            "support.retryable": false,
+            "support.outcome": "completed",
+            "support.category": execution.proposal.category,
+            "support.priority": execution.proposal.priority,
+            "support.confidence": execution.proposal.confidence,
+            "support.action": execution.proposal.action,
+            "support.citation_count": execution.citedSources.length,
+            "support.duration_ms": Math.max(0, Date.now() - startedAt),
+          });
+          log.info(
+            withTraceCorrelation({ event: "resolve_request_completed", traceId }, appTracing),
+          );
+          const response = NextResponse.json(ResolutionApiResultSchema.parse(result), {
+            status: 200,
+          });
+          if (session.cookie) {
+            response.cookies.set(session.cookie.name, session.cookie.value, session.cookie.options);
+          }
+          return response;
+        } catch (error) {
+          const responseError = mapResolutionError(error);
+          rootSpan.setAttributes({
+            "support.api.result_code": responseError.code,
+            "support.retryable": responseError.retryable,
+            "support.outcome": "failed",
+            "support.duration_ms": Math.max(0, Date.now() - startedAt),
+          });
+          rootSpan.fail(normalizedTraceError(responseError.code));
+          log.error(
+            withTraceCorrelation(
+              {
+                event: "resolve_request_failed",
+                traceId,
+                code: responseError.code,
+                retryable: responseError.retryable,
+              },
+              appTracing,
+            ),
+          );
+          return failure(traceId, responseError);
+        }
+      },
+    );
   };
 }
 

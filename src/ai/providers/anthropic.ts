@@ -16,6 +16,7 @@ import { z } from "zod";
 
 import { LlmError } from "@/ai/errors";
 import type { GenerateRequest, GenerateResult, LlmProvider } from "@/ai/types";
+import { tracing, type AppTracing } from "@/observability/tracing";
 
 const AnthropicMessageSchema = z.object({
   id: z.string().min(1),
@@ -26,6 +27,7 @@ const AnthropicMessageSchema = z.object({
     input_tokens: z.number().int().nonnegative(),
     output_tokens: z.number().int().nonnegative(),
     cache_read_input_tokens: z.number().int().nonnegative().nullable().optional(),
+    cache_creation_input_tokens: z.number().int().nonnegative().nullable().optional(),
   }),
 });
 
@@ -42,6 +44,7 @@ type AnthropicProviderOptions = {
   maxRetries: number;
   client?: Anthropic;
   clock?: Partial<Clock>;
+  tracing?: AppTracing;
 };
 
 const defaultClock: Clock = {
@@ -52,6 +55,22 @@ const defaultClock: Clock = {
     }),
   random: () => Math.random(),
 };
+
+function providerMetadata(error: unknown): {
+  providerRequestId?: string;
+  providerStatusCode?: number;
+  providerErrorType?: string;
+} {
+  if (typeof error !== "object" || error === null) {
+    return {};
+  }
+  const candidate = error as { name?: unknown; requestID?: unknown; status?: unknown };
+  return {
+    ...(typeof candidate.requestID === "string" ? { providerRequestId: candidate.requestID } : {}),
+    ...(typeof candidate.status === "number" ? { providerStatusCode: candidate.status } : {}),
+    ...(typeof candidate.name === "string" ? { providerErrorType: candidate.name } : {}),
+  };
+}
 
 function retryAfterMs(error: unknown, now: number): number | undefined {
   if (!(error instanceof APIError) || !error.headers) {
@@ -73,6 +92,8 @@ function retryAfterMs(error: unknown, now: number): number | undefined {
 }
 
 function mapAnthropicError(error: unknown, retryCount: number): LlmError {
+  const metadata = providerMetadata(error);
+  const statusCode = metadata.providerStatusCode;
   if (
     error instanceof APIConnectionTimeoutError ||
     error instanceof APIUserAbortError ||
@@ -82,18 +103,21 @@ function mapAnthropicError(error: unknown, retryCount: number): LlmError {
       retryable: true,
       retryCount,
       cause: error,
+      ...metadata,
     });
   }
 
   if (
     error instanceof RateLimitError ||
     error instanceof APIConnectionError ||
-    (error instanceof APIError && typeof error.status === "number" && error.status >= 500)
+    statusCode === 429 ||
+    (typeof statusCode === "number" && statusCode >= 500)
   ) {
     return new LlmError("unavailable", "The model provider is temporarily unavailable.", {
       retryable: true,
       retryCount,
       cause: error,
+      ...metadata,
     });
   }
 
@@ -101,12 +125,17 @@ function mapAnthropicError(error: unknown, retryCount: number): LlmError {
     error instanceof AuthenticationError ||
     error instanceof PermissionDeniedError ||
     error instanceof BadRequestError ||
-    error instanceof UnprocessableEntityError
+    error instanceof UnprocessableEntityError ||
+    statusCode === 400 ||
+    statusCode === 401 ||
+    statusCode === 403 ||
+    statusCode === 422
   ) {
     return new LlmError("configuration", "The model provider configuration is invalid.", {
       retryable: false,
       retryCount,
       cause: error,
+      ...metadata,
     });
   }
 
@@ -114,6 +143,7 @@ function mapAnthropicError(error: unknown, retryCount: number): LlmError {
     retryable: false,
     retryCount,
     cause: error,
+    ...metadata,
   });
 }
 
@@ -136,6 +166,7 @@ export class AnthropicLlmProvider implements LlmProvider {
   private readonly timeoutMs: number;
   private readonly maxRetries: number;
   private readonly clock: Clock;
+  private readonly tracing: AppTracing;
 
   constructor(options: AnthropicProviderOptions) {
     this.model = options.model;
@@ -148,6 +179,7 @@ export class AnthropicLlmProvider implements LlmProvider {
         maxRetries: 0,
       });
     this.clock = { ...defaultClock, ...options.clock };
+    this.tracing = options.tracing ?? tracing;
   }
 
   async generateStructured<T>(request: GenerateRequest<T>): Promise<GenerateResult<T>> {
@@ -165,9 +197,10 @@ export class AnthropicLlmProvider implements LlmProvider {
       }
 
       const attemptTimeoutMs = Math.max(1, Math.floor(remainingMs));
+      const attemptStartedAt = this.clock.now();
 
       try {
-        const message = await this.client.messages.parse(
+        const pending = this.client.messages.parse(
           {
             model: this.model,
             max_tokens: request.maxOutputTokens,
@@ -186,12 +219,15 @@ export class AnthropicLlmProvider implements LlmProvider {
             timeout: attemptTimeoutMs,
           },
         );
+        const message = await pending;
+        const providerRequestId = message._request_id ?? undefined;
 
         const parsedMessage = AnthropicMessageSchema.safeParse(message);
         if (!parsedMessage.success) {
           throw new LlmError("invalid_output", "The model returned an invalid response.", {
             retryable: false,
             retryCount,
+            providerRequestId,
           });
         }
 
@@ -201,6 +237,7 @@ export class AnthropicLlmProvider implements LlmProvider {
             retryable: false,
             retryCount,
             finishReason,
+            providerRequestId,
           });
         }
 
@@ -209,6 +246,7 @@ export class AnthropicLlmProvider implements LlmProvider {
             retryable: false,
             retryCount,
             finishReason,
+            providerRequestId,
           });
         }
 
@@ -218,9 +256,16 @@ export class AnthropicLlmProvider implements LlmProvider {
             retryable: false,
             retryCount,
             finishReason,
+            providerRequestId,
           });
         }
 
+        this.tracing.getActiveSpan()?.setAttributes({
+          "support.provider_attempt_duration_ms": Math.max(0, this.clock.now() - attemptStartedAt),
+          "support.attempt": retryCount + 1,
+          "support.provider.request_id": providerRequestId,
+          "support.provider.message_id": parsedMessage.data.id,
+        });
         return {
           value: value.data,
           model: parsedMessage.data.model,
@@ -234,14 +279,28 @@ export class AnthropicLlmProvider implements LlmProvider {
               : {
                   cachedInputTokens: parsedMessage.data.usage.cache_read_input_tokens,
                 }),
+            ...(parsedMessage.data.usage.cache_creation_input_tokens === null ||
+            parsedMessage.data.usage.cache_creation_input_tokens === undefined
+              ? {}
+              : {
+                  cacheWriteInputTokens: parsedMessage.data.usage.cache_creation_input_tokens,
+                }),
           },
           latencyMs: Math.max(0, this.clock.now() - startedAt),
           retryCount,
-          providerRequestId: parsedMessage.data.id,
+          ...(providerRequestId ? { providerRequestId } : {}),
+          providerMessageId: parsedMessage.data.id,
         };
       } catch (error) {
         const mapped = error instanceof LlmError ? error : mapAnthropicError(error, retryCount);
+        this.tracing.getActiveSpan()?.setAttributes({
+          "support.provider_attempt_duration_ms": Math.max(0, this.clock.now() - attemptStartedAt),
+          "support.attempt": retryCount + 1,
+          "support.provider.request_id": mapped.providerRequestId,
+          "support.provider.status_code": mapped.providerStatusCode,
+        });
         if (!isRetryable(mapped, retryCount, this.maxRetries)) {
+          this.tracing.getActiveSpan()?.fail(mapped.code);
           throw mapped;
         }
 
@@ -250,13 +309,23 @@ export class AnthropicLlmProvider implements LlmProvider {
         const delayMs = requestedDelay ?? exponentialDelay * (0.75 + this.clock.random() * 0.5);
 
         if (this.clock.now() + delayMs >= deadline) {
+          this.tracing.getActiveSpan()?.fail(mapped.code);
           throw new LlmError(mapped.code, mapped.message, {
             retryable: mapped.retryable,
             retryCount,
             cause: error,
+            providerRequestId: mapped.providerRequestId,
+            providerStatusCode: mapped.providerStatusCode,
+            providerErrorType: mapped.providerErrorType,
           });
         }
 
+        this.tracing.getActiveSpan()?.addRetryEvent({
+          attempt: retryCount + 1,
+          retryCount: retryCount + 1,
+          delayMs,
+          errorCode: mapped.code,
+        });
         await this.clock.sleep(delayMs);
         retryCount += 1;
       }

@@ -12,6 +12,7 @@ import { getAiConfig } from "@/config/ai";
 import { ClassificationSchema, type Classification } from "@/domain/classification";
 import type { TicketInput } from "@/domain/ticket";
 import { createLogger, logger, type AppLogger } from "@/observability/logger";
+import { tracing, withTraceCorrelation, type AppTracing } from "@/observability/tracing";
 
 export type ClassificationContext = {
   traceId: string;
@@ -20,6 +21,7 @@ export type ClassificationContext = {
 type ClassifyTicketOptions = ClassificationContext & {
   provider: LlmProvider;
   log?: AppLogger;
+  tracing?: AppTracing;
 };
 
 export type ClassificationExecution = {
@@ -65,74 +67,132 @@ export async function classifyTicketWithMetadata(
   options: ClassifyTicketOptions,
 ): Promise<ClassificationExecution> {
   const log = options.log ?? logger;
+  const appTracing = options.tracing ?? tracing;
   const startedAt = Date.now();
 
-  try {
-    const result = await options.provider.generateStructured(
-      createClassificationRequest(input, options.traceId),
-    );
-    const classification = ClassificationSchema.safeParse(result.value);
-    if (!classification.success) {
-      throw new LlmError("invalid_output", "The model returned an invalid classification.", {
-        retryable: false,
-        retryCount: result.retryCount,
-        finishReason: result.finishReason,
-      });
-    }
-
-    log.info({
-      event: "model_call",
-      traceId: options.traceId,
-      task: "classification",
-      provider: options.provider.name,
-      model: result.model,
-      promptVersion: CLASSIFICATION_PROMPT_VERSION,
-      providerRequestId: result.providerRequestId,
-      inputTokens: result.usage.inputTokens,
-      outputTokens: result.usage.outputTokens,
-      cachedInputTokens: result.usage.cachedInputTokens,
-      latencyMs: result.latencyMs,
-      finishReason: result.finishReason,
-      validationPassed: true,
-      retryCount: result.retryCount,
-    });
-
-    return {
-      classification: classification.data,
-      metadata: {
-        provider: options.provider.name,
-        model: result.model,
-        promptVersion: CLASSIFICATION_PROMPT_VERSION,
-        inputTokens: result.usage.inputTokens,
-        outputTokens: result.usage.outputTokens,
-        retryCount: result.retryCount,
+  return appTracing.withSpan(
+    "support.ai.classification",
+    {
+      attributes: {
+        "support.trace_id": options.traceId,
+        "support.task": "classification",
+        "support.prompt.version": CLASSIFICATION_PROMPT_VERSION,
+        "gen_ai.provider.name": options.provider.name,
+        "gen_ai.request.model": options.provider.model,
       },
-    };
-  } catch (error) {
-    const llmError = isLlmError(error)
-      ? error
-      : new LlmError("unexpected", "Classification failed.", {
-          retryable: false,
-          cause: error,
+    },
+    async (span) => {
+      try {
+        const result = await options.provider.generateStructured(
+          createClassificationRequest(input, options.traceId),
+        );
+        const classification = ClassificationSchema.safeParse(result.value);
+        if (!classification.success) {
+          throw new LlmError("invalid_output", "The model returned an invalid classification.", {
+            retryable: false,
+            retryCount: result.retryCount,
+            finishReason: result.finishReason,
+            providerRequestId: result.providerRequestId,
+          });
+        }
+
+        span.setAttributes({
+          "gen_ai.response.model": result.model,
+          "gen_ai.usage.input_tokens": result.usage.inputTokens,
+          "gen_ai.usage.output_tokens": result.usage.outputTokens,
+          "support.usage.cached_input_tokens": result.usage.cachedInputTokens,
+          "support.usage.cache_write_tokens": result.usage.cacheWriteInputTokens,
+          "support.provider.request_id": result.providerRequestId,
+          "support.provider.message_id": result.providerMessageId,
+          "support.finish_reason": result.finishReason,
+          "support.duration_ms": result.latencyMs,
+          "support.validation.passed": true,
+          "support.validation.outcome": "valid",
+          "support.retry_count": result.retryCount,
+          "support.category": classification.data.category,
+          "support.priority": classification.data.priority,
+          "support.confidence": classification.data.confidence,
+          "support.outcome": "completed",
         });
+        log.info(
+          withTraceCorrelation(
+            {
+              event: "model_call",
+              traceId: options.traceId,
+              task: "classification",
+              provider: options.provider.name,
+              model: result.model,
+              promptVersion: CLASSIFICATION_PROMPT_VERSION,
+              providerRequestId: result.providerRequestId,
+              providerMessageId: result.providerMessageId,
+              inputTokens: result.usage.inputTokens,
+              outputTokens: result.usage.outputTokens,
+              cachedInputTokens: result.usage.cachedInputTokens,
+              latencyMs: result.latencyMs,
+              finishReason: result.finishReason,
+              validationPassed: true,
+              retryCount: result.retryCount,
+            },
+            appTracing,
+          ),
+        );
 
-    log.error({
-      event: "model_call",
-      traceId: options.traceId,
-      task: "classification",
-      provider: options.provider.name,
-      model: options.provider.model,
-      promptVersion: CLASSIFICATION_PROMPT_VERSION,
-      inputTokens: 0,
-      outputTokens: 0,
-      latencyMs: Math.max(0, Date.now() - startedAt),
-      finishReason: llmError.finishReason ?? llmError.code,
-      validationPassed: false,
-      retryCount: llmError.retryCount,
-    });
+        return {
+          classification: classification.data,
+          metadata: {
+            provider: options.provider.name,
+            model: result.model,
+            promptVersion: CLASSIFICATION_PROMPT_VERSION,
+            inputTokens: result.usage.inputTokens,
+            outputTokens: result.usage.outputTokens,
+            retryCount: result.retryCount,
+          },
+        };
+      } catch (error) {
+        const llmError = isLlmError(error)
+          ? error
+          : new LlmError("unexpected", "Classification failed.", {
+              retryable: false,
+              cause: error,
+            });
 
-    throw llmError;
-  }
+        span.setAttributes({
+          "support.duration_ms": Math.max(0, Date.now() - startedAt),
+          "support.finish_reason": llmError.finishReason ?? llmError.code,
+          "support.validation.passed": false,
+          "support.validation.outcome": "invalid",
+          "support.retry_count": llmError.retryCount,
+          "support.provider.request_id": llmError.providerRequestId,
+          "support.provider.status_code": llmError.providerStatusCode,
+          "support.outcome": "failed",
+        });
+        span.fail(llmError.code);
+        log.error(
+          withTraceCorrelation(
+            {
+              event: "model_call",
+              traceId: options.traceId,
+              task: "classification",
+              provider: options.provider.name,
+              model: options.provider.model,
+              promptVersion: CLASSIFICATION_PROMPT_VERSION,
+              inputTokens: 0,
+              outputTokens: 0,
+              latencyMs: Math.max(0, Date.now() - startedAt),
+              finishReason: llmError.finishReason ?? llmError.code,
+              providerStatusCode: llmError.providerStatusCode,
+              providerErrorType: llmError.providerErrorType,
+              validationPassed: false,
+              retryCount: llmError.retryCount,
+            },
+            appTracing,
+          ),
+        );
+
+        throw llmError;
+      }
+    },
+  );
 }
 
 export async function classifyTicketWithConfiguredProvider(
@@ -154,6 +214,7 @@ export async function classifyTicketWithConfiguredProvider(
     model: config.model,
     timeoutMs: config.requestTimeoutMs,
     maxRetries: config.maxRetries,
+    tracing,
   });
 
   return classifyTicket(input, {
