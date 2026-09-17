@@ -75,9 +75,10 @@ export function selectEvidence(
 }
 
 export async function retrieveEvidence(
-  input: { text: string; category: string; traceId: string },
+  input: { text: string; category?: string; traceId: string; signal?: AbortSignal },
   options: RetrieveOptions,
 ): Promise<RetrievedEvidence[]> {
+  input.signal?.throwIfAborted();
   const log = options.log ?? logger;
   const appTracing = options.tracing ?? tracing;
   const startedAt = Date.now();
@@ -88,7 +89,7 @@ export async function retrieveEvidence(
         "support.trace_id": input.traceId,
         "support.operation": "evidence_retrieval",
         "support.retrieval.version": options.config.version,
-        "support.retrieval.category_filter": input.category,
+        "support.retrieval.category_filter": input.category ?? "all",
         "support.retrieval.minimum_similarity": options.config.minimumSimilarity,
         "support.retrieval.maximum_context_tokens": options.config.maximumContextTokens,
       },
@@ -111,11 +112,13 @@ export async function retrieveEvidence(
           },
           async (span) => {
             try {
+              input.signal?.throwIfAborted();
               const result = await options.embedder.embed([input.text], {
                 traceId: input.traceId,
                 operation: "retrieval",
                 inputType: "query",
               });
+              input.signal?.throwIfAborted();
               span.setAttributes({
                 "gen_ai.response.model": result.model,
                 "support.embedding.token_count": result.usage.inputTokens,
@@ -144,22 +147,25 @@ export async function retrieveEvidence(
             attributes: {
               "support.trace_id": input.traceId,
               "support.operation": "cosine_similarity_search",
-              "support.retrieval.category_filter": input.category,
+              "support.retrieval.category_filter": input.category ?? "all",
             },
           },
           async (span) => {
             try {
+              input.signal?.throwIfAborted();
               const categoryCandidates = await options.search({
                 embedding: queryEmbedding,
-                category: input.category,
+                ...(input.category ? { category: input.category } : {}),
                 limit: options.config.candidateCount,
               });
               let found = categoryCandidates;
               if (
+                input.category &&
                 eligibleCandidates(categoryCandidates, options.config.minimumSimilarity).length <
-                options.config.minimumEvidenceCount
+                  options.config.minimumEvidenceCount
               ) {
                 fallbackUsed = true;
+                input.signal?.throwIfAborted();
                 found = [
                   ...categoryCandidates,
                   ...(await options.search({
@@ -168,6 +174,7 @@ export async function retrieveEvidence(
                   })),
                 ];
               }
+              input.signal?.throwIfAborted();
               span.setAttributes({
                 "support.retrieval.fallback_used": fallbackUsed,
                 "support.retrieval.candidate_count": found.length,
@@ -229,6 +236,7 @@ export async function retrieveEvidence(
         retrievalSpan.setAttributes({ "support.outcome": "completed" });
         return selected;
       } catch (error) {
+        if (input.signal?.aborted) throw input.signal.reason;
         if (isRetrievalError(error)) throw error;
         retrievalSpan.setAttributes({
           "support.retrieval.fallback_used": fallbackUsed,

@@ -1,0 +1,98 @@
+[
+  {
+    "id": "INV-DEMO-2001",
+    "customerId": "CUST-DEMO-1001",
+    "status": "settled",
+    "amountMinor": 4900,
+    "currency": "USD",
+    "planCode": "pro-monthly",
+    "billingPeriodStart": "2026-08-01",
+    "billingPeriodEnd": "2026-08-31",
+    "chargedAt": "2026-08-01T08:15:00Z",
+    "processorReference": "proc-demo-a001"
+  },
+  {
+    "id": "INV-DEMO-2002",
+    "customerId": "CUST-DEMO-1001",
+    "status": "settled",
+    "amountMinor": 4900,
+    "currency": "USD",
+    "planCode": "pro-monthly",
+    "billingPeriodStart": "2026-08-01",
+    "billingPeriodEnd": "2026-08-31",
+    "chargedAt": "2026-08-01T08:17:00Z",
+    "processorReference": "proc-demo-a002"
+  },
+  {
+    "id": "INV-DEMO-2003",
+    "customerId": "CUST-DEMO-1001",
+    "status": "settled",
+    "amountMinor": 4900,
+    "currency": "USD",
+    "planCode": "pro-monthly",
+    "billingPeriodStart": "2026-07-01",
+    "billingPeriodEnd": "2026-07-31",
+    "chargedAt": "2026-07-01T08:15:00Z",
+    "processorReference": "proc-demo-a003"
+  },
+  {
+    "id": "INV-DEMO-2004",
+    "customerId": "CUST-DEMO-1001",
+    "status": "refunded",
+    "amountMinor": 4900,
+    "currency": "USD",
+    "planCode": "pro-monthly",
+    "billingPeriodStart": "2026-06-01",
+    "billingPeriodEnd": "2026-06-30",
+    "chargedAt": "2026-06-01T08:15:00Z",
+    "processorReference": "proc-demo-a004"
+  },
+  {
+    "id": "INV-DEMO-2005",
+    "customerId": "CUST-DEMO-1001",
+    "status": "settled",
+    "amountMinor": 4900,
+    "currency": "USD",
+    "planCode": "pro-monthly",
+    "billingPeriodStart": "2026-05-01",
+    "billingPeriodEnd": "2026-05-31",
+    "chargedAt": "2026-05-01T08:15:00Z",
+    "processorReference": "proc-demo-a005"
+  },
+  {
+    "id": "INV-DEMO-2006",
+    "customerId": "CUST-DEMO-1001",
+    "status": "void",
+    "amountMinor": 4900,
+    "currency": "USD",
+    "planCode": "pro-monthly",
+    "billingPeriodStart": "2026-04-01",
+    "billingPeriodEnd": "2026-04-30",
+    "chargedAt": "2026-04-01T08:15:00Z",
+    "processorReference": "proc-demo-a006"
+  },
+  {
+    "id": "INV-DEMO-2007",
+    "customerId": "CUST-DEMO-1002",
+    "status": "open",
+    "amountMinor": 1900,
+    "currency": "EUR",
+    "planCode": "starter-monthly",
+    "billingPeriodStart": "2026-09-01",
+    "billingPeriodEnd": "2026-09-30",
+    "chargedAt": "2026-09-01T09:00:00Z",
+    "processorReference": "proc-demo-b001"
+  },
+  {
+    "id": "INV-DEMO-2008",
+    "customerId": "CUST-DEMO-1003",
+    "status": "settled",
+    "amountMinor": 7900,
+    "currency": "USD",
+    "planCode": "business-monthly",
+    "billingPeriodStart": "2026-09-01",
+    "billingPeriodEnd": "2026-09-30",
+    "chargedAt": "2026-09-02T10:00:00Z",
+    "processorReference": "proc-demo-c001"
+  }
+]

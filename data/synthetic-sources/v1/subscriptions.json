@@ -1,0 +1,32 @@
+[
+  {
+    "id": "SUB-DEMO-3001",
+    "customerId": "CUST-DEMO-1001",
+    "state": "active",
+    "planCode": "pro-monthly",
+    "renewalDate": "2026-10-01",
+    "pendingPlanCode": null,
+    "pendingChangeDate": null,
+    "internalNote": "Synthetic active subscription."
+  },
+  {
+    "id": "SUB-DEMO-3002",
+    "customerId": "CUST-DEMO-1002",
+    "state": "active",
+    "planCode": "pro-monthly",
+    "renewalDate": "2026-10-15",
+    "pendingPlanCode": "starter-monthly",
+    "pendingChangeDate": "2026-10-15",
+    "internalNote": "Synthetic downgrade scheduled for renewal."
+  },
+  {
+    "id": "SUB-DEMO-3003",
+    "customerId": "CUST-DEMO-1003",
+    "state": "active",
+    "planCode": "business-monthly",
+    "renewalDate": "2026-10-02",
+    "pendingPlanCode": null,
+    "pendingChangeDate": null,
+    "internalNote": "Deliberately conflicts with the customer's closed account state."
+  }
+]
