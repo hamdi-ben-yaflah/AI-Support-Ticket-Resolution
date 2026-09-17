@@ -1,28 +1,31 @@
 # Technical Specification: AI Support Ticket Resolution Copilot
 
-**Status:** Draft 1.0  
+**Status:** Implemented V1 historical baseline
 **Related document:** `ai-support-copilot-prd.md`  
 **Runtime:** Node.js with TypeScript
 
+This specification describes the implemented V1 architecture. It does not claim that the current live evaluation passes every quality threshold; see the README for the latest measured regression. A future V2 specification may add the separately approved single bounded investigation agent without turning this baseline into a general-purpose autonomous system.
+
 ## 1. Technical objective
 
-Implement a portfolio-sized AI support workflow that converts a ticket into a validated classification and grounded resolution proposal. The design must isolate model-provider details, treat model output as untrusted input, keep actions under application control, and provide repeatable evaluations.
+The implemented portfolio-sized AI support workflow converts a ticket into a validated classification and grounded resolution proposal. It isolates model-provider details, treats model output as untrusted input, keeps actions under application control, and provides repeatable evaluations.
 
-## 2. Recommended stack
+## 2. Implemented stack
 
-| Area              | Choice                            | Rationale                                                                              |
-| ----------------- | --------------------------------- | -------------------------------------------------------------------------------------- |
-| Web application   | Next.js with App Router           | One TypeScript codebase for UI and server routes                                       |
-| Language          | TypeScript in strict mode         | Strong contracts across AI boundaries                                                  |
-| Validation        | Zod                               | Runtime validation plus inferred TypeScript types                                      |
-| Database          | PostgreSQL                        | Durable relational state and audit records                                             |
-| Vector search     | pgvector                          | Keeps MVP relational and vector data together                                          |
-| ORM               | Drizzle ORM                       | Typed schema and explicit SQL-friendly behavior                                        |
-| LLM provider      | Anthropic adapter                 | Anthropic remains the only text-generation provider for this story                     |
-| Embeddings        | Voyage AI embedding adapter       | Separate capability from text generation; use document/query input types for retrieval |
-| Testing           | Vitest                            | Unit and integration tests in TypeScript                                               |
-| Logging           | Pino-compatible structured logger | JSON telemetry with redaction                                                          |
-| Local environment | Podman Compose                    | Reproducible PostgreSQL and pgvector setup                                             |
+| Area              | Choice                                      | Rationale                                                                              |
+| ----------------- | ------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Web application   | Next.js with App Router                     | One TypeScript codebase for UI and server routes                                       |
+| Language          | TypeScript in strict mode                   | Strong contracts across AI boundaries                                                  |
+| Validation        | Zod                                         | Runtime validation plus inferred TypeScript types                                      |
+| Database          | PostgreSQL                                  | Durable relational state and audit records                                             |
+| Vector search     | pgvector                                    | Keeps MVP relational and vector data together                                          |
+| ORM               | Drizzle ORM                                 | Typed schema and explicit SQL-friendly behavior                                        |
+| LLM provider      | Anthropic adapter                           | Anthropic remains the only text-generation provider for this story                     |
+| Embeddings        | Voyage AI embedding adapter                 | Separate capability from text generation; use document/query input types for retrieval |
+| Testing           | Vitest                                      | Unit and integration tests in TypeScript                                               |
+| Logging           | Pino-compatible structured logger           | JSON telemetry with redaction                                                          |
+| AI tracing        | OpenTelemetry with optional Langfuse export | Project-owned metadata-only spans with a fail-open diagnostic backend                  |
+| Local environment | Podman Compose                              | Reproducible PostgreSQL and pgvector setup                                             |
 
 The provider and concrete model names are configuration, not domain constants.
 
@@ -36,7 +39,9 @@ flowchart TD
     PIPE --> RET["Retrieval service"]
     RET --> DB[("PostgreSQL + pgvector")]
     PIPE --> TOOL["Mock action service"]
-    EVAL["Evaluation runner"] --> PIPE
+    EVAL["CLI + local evaluation console"] --> PIPE
+    EVAL --> DB
+    PIPE -. "metadata-only spans" .-> OTEL["OpenTelemetry / optional Langfuse"]
 ```
 
 ## 4. Repository structure
@@ -45,30 +50,36 @@ flowchart TD
 src/
   app/
     api/tickets/resolve/route.ts
-    api/actions/refund-review/route.ts
-    evaluations/page.tsx
+    api/actions/refund-review/[proposalId]/confirm/route.ts
+    api/sources/[chunkId]/route.ts
+    api/evaluations/{run,runs,compare}/route.ts
+    admin/evaluations/
     page.tsx
   domain/
+    classification.ts
+    grounded-reply.ts
+    refund-review.ts
+    resolution-run.ts
     ticket.ts
-    resolution.ts
-    citation.ts
-    action.ts
   ai/
-    contracts.ts
     prompts/
       classify.v1.ts
-      resolve.v1.ts
+      resolve.v4.ts
     providers/
-      llm-provider.ts
-      voyage-provider.ts
-      anthropic-provider.ts
+      anthropic.ts
     pipeline/
       classify-ticket.ts
       resolve-ticket.ts
       validate-grounding.ts
-  retrieval/
+    types.ts
+  embeddings/
+    providers/voyage.ts
+    types.ts
+  ingestion/
     chunk-markdown.ts
-    embeddings.ts
+    ingest.ts
+    inspection.ts
+  retrieval/
     search.ts
   actions/
     request-refund-review.ts
@@ -76,15 +87,18 @@ src/
     schema.ts
     client.ts
   observability/
-    trace.ts
+    tracing.ts
+    instrumentation-node.ts
     logger.ts
   evals/
     runner.ts
     graders.ts
     thresholds.ts
+    comparison.ts
 data/
   knowledge-base/
   evals/golden.jsonl
+drizzle/
 scripts/
   ingest.ts
   inspect-chunks.ts
@@ -130,17 +144,19 @@ export const CitationSchema = z.object({
   claim: z.string().min(1),
 });
 
-export const ResolutionSchema = z.object({
-  category: z.enum(["billing", "technical", "account", "other"]),
-  priority: z.enum(["low", "medium", "high"]),
-  summary: z.string().min(1).max(300),
+export const GroundedReplySchema = z.object({
   suggestedResponse: z.string().min(1).max(4_000),
-  citations: z.array(CitationSchema).max(8),
-  confidence: z.number().min(0).max(1),
-  action: z.enum(["reply", "request_refund_review", "escalate", "needs_human_review"]),
-  reason: z.string().min(1).max(500),
+  citations: z.array(CitationSchema).min(1).max(8),
 });
+
+export const ResolutionProposalSchema = z.discriminatedUnion("action", [
+  ReplyResolutionProposalSchema,
+  RefundReviewResolutionProposalSchema,
+  HumanReviewResolutionProposalSchema,
+]);
 ```
+
+`reply` and `request_refund_review` include a `groundedReply`; `needs_human_review` deliberately includes neither a draft nor citations. Refund review is billing-only and adds a validated pending action proposal whose evidence IDs exactly match its citations.
 
 ### 5.4 API response envelope
 
@@ -170,7 +186,6 @@ export type GenerateRequest<T> = {
   outputSchema: z.ZodType<T>;
   maxOutputTokens: number;
   temperature?: number;
-  tools?: ToolDefinition[];
   metadata: {
     traceId: string;
     promptVersion: string;
@@ -187,22 +202,41 @@ export type GenerateResult<T> = {
     cachedInputTokens?: number;
   };
   latencyMs: number;
+  retryCount: number;
   providerRequestId?: string;
+  providerMessageId?: string;
 };
 
 export interface LlmProvider {
+  readonly name: string;
+  readonly model: string;
   generateStructured<T>(request: GenerateRequest<T>): Promise<GenerateResult<T>>;
 }
 
 export interface EmbeddingProvider {
-  dimensions: number;
-  embed(texts: string[]): Promise<number[][]>;
+  readonly name: string;
+  readonly model: string;
+  readonly dimensions: number;
+  embed(
+    texts: readonly string[],
+    metadata: {
+      traceId: string;
+      operation: "ingestion" | "retrieval";
+      inputType: "document" | "query";
+    },
+  ): Promise<{
+    vectors: number[][];
+    model: string;
+    usage: { inputTokens: number };
+    latencyMs: number;
+    retryCount: number;
+  }>;
 }
 ```
 
 Each adapter must:
 
-- Translate internal messages, schemas, tools, finish reasons, and usage fields.
+- Translate internal prompts, schemas, finish reasons, identifiers, and usage fields.
 - Apply a request timeout.
 - Map provider errors into application error classes.
 - Parse JSON and validate it with the supplied Zod schema.
@@ -237,17 +271,17 @@ Do not silently retry schema-invalid output with a changed prompt. Such behavior
 | `embedding`   | Vector  | Dimension matches embedding provider    |
 | `metadata`    | JSONB   | Category and custom filters             |
 
-### `resolution_runs`
+### `resolution_runs` and `resolution_run_sources`
 
-Stores trace ID, prompt versions, selected model, result status, classification, action, latency, token counts, and timestamps. Raw ticket text is optional and disabled by default.
+Successful runs store the trace ID, keyed session and ticket hashes, prompt versions, selected model, validated classification/action, latency, token counts, retries, and timestamps. Raw ticket text, full prompts, and provider responses are never stored. Grounded outcomes atomically store immutable snapshots of only their cited chunks in `resolution_run_sources`; session ownership gates later source access.
 
 ### `action_audit`
 
-Stores proposed arguments, confirmation time, execution status, and trace ID for mock actions.
+Stores one opaque proposal per resolution, validated proposed arguments, pending/executed state, confirmation and execution timestamps, immutable result, and trace ID. Confirmation is session-owned, explicitly requested, row-locked, and idempotent.
 
 ### `evaluation_runs` and `evaluation_results`
 
-Store aggregate configuration and per-case scores. Large raw results may alternatively be written as versioned JSON artifacts.
+Store the validated report schema/status, dataset version/hash/count, provider and generation/judge models, prompt/retrieval/policy/threshold configuration, safe aggregate metrics, and compact per-case actuals/scores/telemetry/sanitized errors. They intentionally omit ticket text, generated drafts, source excerpts, prompts, vectors, credentials, and provider payloads. The CLI can additionally write the complete schema-validated safe report to an ignored JSON artifact.
 
 ## 8. Knowledge-base ingestion
 
@@ -264,7 +298,7 @@ Pipeline:
 3. Split content by semantic section, then by token-aware size.
 4. Target 300–600 tokens per chunk with 50–100 tokens of overlap only when a section must be split.
 5. Preserve `sourceId`, heading path, chunk index, and content hash.
-6. Batch embedding requests.
+6. Batch Voyage AI `document` embedding requests and require exactly 1,024 finite dimensions.
 7. Upsert documents and replace chunks only when the content hash changes.
 8. Delete superseded chunks within the same transaction.
 
@@ -338,14 +372,18 @@ Algorithm:
 ```ts
 export async function resolveTicket(input: TicketInput, ctx: RequestContext) {
   const classification = await classifyTicket(input, ctx);
-  const chunks = await retrieveEvidence(input.text, classification.category);
 
-  if (!hasSufficientEvidence(chunks)) {
+  if (classification.confidence < ctx.policy.minimumConfidence) {
+    return createHumanReviewResolution(classification, "Low confidence");
+  }
+
+  const evidence = await retrieveEvidence(input.text, classification.category);
+  if (!hasSufficientEvidence(evidence)) {
     return createHumanReviewResolution(classification, "Insufficient evidence");
   }
 
-  const proposal = await generateResolution({ input, classification, chunks }, ctx);
-  const validated = validateResolutionAgainstContext(proposal, chunks);
+  const decision = await generateResolution({ input, classification, evidence }, ctx);
+  const validated = validateResolutionAgainstContext(decision, evidence);
 
   return validated.ok
     ? validated.value
@@ -387,7 +425,7 @@ Temperature should default to zero or the provider's lowest stable setting for c
 
 ## 12. Tool calling and action control
 
-Tool definition:
+Server-owned action-argument contract:
 
 ```ts
 export const RequestRefundReviewArgsSchema = z.object({
@@ -397,16 +435,16 @@ export const RequestRefundReviewArgsSchema = z.object({
 });
 ```
 
-The model may propose an action, but the server owns execution:
+The V1 model returns a structured action enum rather than a dynamic tool name. The server owns proposal construction and execution:
 
-1. Validate tool name and arguments.
+1. Allow `request_refund_review` only for billing outcomes and construct schema-valid arguments from the validated decision.
 2. Confirm cited chunk IDs belong to the current resolution run.
 3. Create an action proposal with an opaque ID and `pending_confirmation` state.
 4. Display the proposal to the user.
-5. Accept a separate authenticated confirmation request.
+5. Accept a separate signed-session-owned confirmation request containing exactly `{ "confirmed": true }`.
 6. Execute the mock action once and store the audit result.
 
-Use a unique constraint or idempotency key on the proposal ID to prevent duplicate execution.
+The implementation uses unique constraints plus a database row lock so first, repeated, and concurrent confirmations return one immutable stored result. V2 may add a separate bounded read-only investigation loop, but mock mutations remain outside that loop and retain this confirmation boundary.
 
 ## 13. API endpoints
 
@@ -433,7 +471,11 @@ Confirms and executes the mock action. Repeated requests return the original res
 
 ### `GET /api/sources/:chunkId`
 
-Returns display-safe source metadata and content only when the chunk belongs to the requesting resolution context. The MVP may use a server-generated signed reference or session-bound authorization.
+Returns display-safe source metadata and content only when an immutable cited-source snapshot belongs to the requesting signed session. Unknown, uncited, and cross-session identifiers share the same non-revealing response.
+
+### Local evaluation endpoints
+
+`POST /api/evaluations/run`, `GET /api/evaluations/runs`, and `GET /api/evaluations/compare` power the local-only evaluation console. They are unauthenticated because the surface is for isolated local operation, permit one in-process live run at a time, return private non-cacheable responses, and are disabled by default in production with a non-revealing `404`.
 
 ## 14. Error and retry policy
 
@@ -453,7 +495,7 @@ All calls use an overall deadline. Retries must not multiply beyond that deadlin
 
 ## 15. Observability
 
-Create one trace ID at the API boundary and propagate it through retrieval, generation, validation, and tool execution.
+Create one application trace ID at the API boundary and propagate it through generation, retrieval, validation, and persistence. Pino events remain redacted structured logs. When explicitly enabled, a project-owned OpenTelemetry facade exports only allowlisted metadata through a batched, fail-open Langfuse span processor; missing configuration selects a no-op tracer, and CLI/test entry points do not initialize the exporter.
 
 Log fields:
 
@@ -475,7 +517,9 @@ type AiCallLog = {
 };
 ```
 
-Redact authorization headers, API keys, raw ticket text, customer identifiers, and full model prompts. Development-only prompt inspection must be explicitly enabled.
+Redact authorization headers, API keys, raw ticket text, customer identifiers, full model prompts, generated output, source content, and provider response bodies.
+
+The exported tree contains classification, query embedding, vector search, resolution, grounding validation, and persistence spans with safe model/token/retry/latency/outcome metadata. It excludes ticket text, summaries, prompts, generated drafts, source and chunk identifiers/content, vectors, session and ticket hashes, cookies, action arguments, credentials, raw provider bodies, exception messages, and stacks. Langfuse is diagnostic only; PostgreSQL and Pino remain the durable and operational records. A live Langfuse trace audit requires separately configured credentials and is not implied by deterministic test coverage.
 
 ## 16. Evaluation design
 
@@ -485,18 +529,24 @@ Redact authorization headers, API keys, raw ticket text, customer identifiers, a
 
 ```json
 {
-  "id": "billing-duplicate-001",
-  "ticket": "I upgraded yesterday, but I was charged for both plans.",
-  "expectedCategory": "billing",
-  "expectedPriority": ["medium", "high"],
-  "expectedAction": ["request_refund_review", "needs_human_review"],
-  "relevantSourceIds": ["refund-policy"],
-  "shouldAbstain": false,
+  "id": "eval-billing-duplicate-001",
+  "datasetVersion": "golden.v2",
+  "ticket": {
+    "text": "I upgraded yesterday, but I was charged for both plans.",
+    "customerTier": "standard"
+  },
+  "expected": {
+    "category": "billing",
+    "priorities": ["medium", "high"],
+    "actions": ["request_refund_review"],
+    "relevantSourceIds": ["duplicate-charges"],
+    "shouldAbstain": false
+  },
   "tags": ["billing", "duplicate-charge"]
 }
 ```
 
-Include normal, ambiguous, unanswerable, adversarial, and tool-selection cases.
+The implemented `golden.v2` dataset contains 36 normal, ambiguous, unanswerable, adversarial, and action-selection cases. Loading fails before provider work for malformed JSONL, blank lines, duplicate IDs, mixed versions, or a case count outside 30–50.
 
 ### Graders
 
@@ -514,7 +564,7 @@ LLM-judge results are advisory and must be inspectable. Run a small human-review
 ### Evaluation command
 
 ```bash
-npm run eval -- --concurrency=3 --output=artifacts/eval-results.json
+pnpm eval -- --concurrency=3 --output=artifacts/eval-results.json
 ```
 
 The runner must:
@@ -523,6 +573,7 @@ The runner must:
 - Preserve each case ID.
 - Store provider, model, prompt, retrieval, and dataset versions.
 - Produce JSON plus a concise console summary.
+- Persist a schema-validated safe aggregate and compact per-case history transactionally.
 - Exit non-zero when configured regression thresholds fail.
 
 Initial thresholds:
@@ -536,6 +587,10 @@ export const thresholds = {
   abstentionAccuracy: 0.85,
 };
 ```
+
+The same service backs `/admin/evaluations`, which lists recent persisted runs and compares an explicit baseline/candidate pair only when report schema, dataset version/hash, and case-ID set are compatible. It displays version/configuration drift and signed quality/operational deltas without treating a confounded comparison as a universal winner. Production disables the page and all evaluation APIs by default.
+
+The implemented feature surface is complete, but the newest live run is a threshold regression. Feature readiness and measured model/retrieval quality are reported separately.
 
 ## 17. Testing strategy
 
@@ -560,9 +615,9 @@ export const thresholds = {
 
 Keep a small opt-in suite excluded from ordinary CI. Require an explicit environment flag and enforce a token/cost budget.
 
-### CI
+### CI and deployment
 
-CI runs formatting, linting, type checking, unit tests, and integration tests. Full live-model evaluations run manually or on an explicitly configured schedule, not on every pull request.
+CI runs formatting, linting, type checking, migration consistency, deterministic unit/coverage tests, PostgreSQL integration tests, the production build, container smoke tests, and security checks without provider secrets. Merges to `main` publish the exact verified `linux/amd64` image and deploy it through a protected production environment; liveness, database readiness, home-page response, expected revision, and disabled production evaluation surfaces are verified. Full live-model evaluations run only by manual dispatch of the separate workflow against a disposable pgvector database; they are not scheduled and are not a pull-request or release gate.
 
 ## 18. Security considerations
 
@@ -583,15 +638,22 @@ Example environment variables:
 
 ```text
 DATABASE_URL=
-LLM_PROVIDER=
+ANTHROPIC_API_KEY=
 LLM_MODEL=
-EMBEDDING_PROVIDER=
+VOYAGE_API_KEY=
 EMBEDDING_MODEL=
 AI_REQUEST_TIMEOUT_MS=15000
 AI_MAX_RETRIES=2
-RETRIEVAL_TOP_K=5
-RETRIEVAL_MIN_SIMILARITY=0.65
-LOG_RAW_AI_CONTENT=false
+EMBEDDING_DIMENSIONS=1024
+RETRIEVAL_CANDIDATE_COUNT=8
+RETRIEVAL_FINAL_COUNT=5
+RETRIEVAL_MINIMUM_SIMILARITY=0.65
+RESOLUTION_MINIMUM_CONFIDENCE=0.65
+SESSION_COOKIE_SECRET=
+ENABLE_LIVE_EVALUATIONS=true
+LANGFUSE_ENABLED=false
+LANGFUSE_PUBLIC_KEY=
+LANGFUSE_SECRET_KEY=
 ```
 
 Secrets belong in `.env.local` or the deployment secret manager. Commit only `.env.example` with empty values.
@@ -606,6 +668,7 @@ pnpm ingest
 pnpm chunks:inspect
 pnpm dev
 pnpm test
+pnpm verify
 ```
 
 Exact scripts must be documented in the README and kept consistent with `package.json`.
@@ -616,7 +679,7 @@ Exact scripts must be documented in the README and kept consistent with `package
 - **PostgreSQL plus pgvector:** reduces operational surface for an MVP; a dedicated vector store is unnecessary at this scale.
 - **Structured outputs plus Zod:** provider-side schema enforcement improves reliability, while local validation preserves the application's trust boundary.
 - **Mock action:** demonstrates safe tool architecture without creating real-world risk.
-- **No framework-managed autonomous loop:** the pipeline remains explicit, testable, and bounded.
+- **No general-purpose autonomous loop in V1:** the resolution pipeline remains explicit and testable. The approved V2 direction is limited to one application-owned investigation loop with an enumerated read-only synthetic tool allowlist, strict schemas and budgets, deterministic termination, and separate human confirmation for mock mutations.
 - **Synthetic data:** makes the repository safe to share and evaluations reproducible.
 
 ## 22. Definition of done

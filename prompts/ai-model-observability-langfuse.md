@@ -1,5 +1,7 @@
 # Add metadata-only AI tracing with OpenTelemetry and Langfuse
 
+**Status:** Implemented in `c8c801e`; deterministic instrumentation and privacy-boundary tests pass. A credentialed live Langfuse trace/export audit has not yet been recorded.
+
 ## Objective
 
 Add end-to-end, privacy-preserving traces for ticket resolution so an operator can inspect classification, embedding, retrieval, resolution, validation, persistence, retries, and failures as one correlated execution. Use OpenTelemetry as the project-owned instrumentation boundary and Langfuse as the initial trace backend without making Langfuse part of domain or provider contracts.

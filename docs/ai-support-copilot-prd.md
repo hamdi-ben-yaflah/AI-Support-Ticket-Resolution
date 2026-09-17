@@ -1,14 +1,16 @@
 # Product Requirements Document: AI Support Ticket Resolution Copilot
 
-**Status:** Draft 1.0  
+**Status:** Implemented V1 historical baseline
 **Product type:** Portfolio-ready web application  
 **Primary implementation language:** TypeScript
+
+This document records the implemented V1 product contract. Feature completion does not imply that every quality target below currently passes: the latest live measurement is documented as a regression in the README. The approved V2 planning task may intentionally supersede only the constraints it identifies for a single bounded investigation agent.
 
 ## 1. Product summary
 
 AI Support Ticket Resolution Copilot helps a support agent understand and respond to an incoming customer ticket. It classifies the ticket, retrieves relevant knowledge-base content, drafts an evidence-backed response with citations, and recommends a next action. Low-confidence or unsupported cases are sent for human review.
 
-This project is designed to demonstrate production-oriented AI application engineering: structured model outputs, retrieval-augmented generation (RAG), tool calling, validation, evaluation, observability, and failure handling.
+This project demonstrates production-oriented AI application engineering: structured model outputs, retrieval-augmented generation (RAG), controlled mock-action proposals, validation, evaluation, observability, and failure handling.
 
 ## 2. Problem
 
@@ -36,6 +38,8 @@ Build a small application that converts a support ticket into a validated resolu
 
 These are project targets, not service-level guarantees.
 
+They are also quality gates rather than a claim about the current model/retrieval baseline. V1 feature scope is implemented, but the newest live evaluation remains below several configured thresholds.
+
 ## 4. Non-goals
 
 The MVP will not:
@@ -47,6 +51,8 @@ The MVP will not:
 - Build a general-purpose autonomous agent.
 - Support arbitrary file formats or production-scale document ingestion.
 - Provide enterprise authentication, billing, or multi-region deployment.
+
+A separately approved V2 product-definition task may introduce one application-controlled, budget-bounded investigation agent over an enumerated set of read-only synthetic tools. General-purpose autonomy, dynamic tool discovery, arbitrary execution, multi-agent systems, and unconfirmed mutations remain out of scope.
 
 ## 5. Users
 
@@ -67,7 +73,7 @@ Needs to inspect retrieval results, model decisions, evaluation scores, latency,
 5. As a support agent, I can approve or reject a proposed mock action.
 6. As an engineer, I can ingest the sample knowledge base and inspect the created chunks.
 7. As an engineer, I can run a repeatable evaluation suite from the command line.
-8. As an engineer, I can compare evaluation results by prompt and model version.
+8. As an engineer, I can inspect persisted safe evaluation history and compare compatible runs by prompt and model version from a local-only console.
 
 ## 7. MVP experience
 
@@ -89,7 +95,7 @@ The application returns:
 - Draft response.
 - Confidence value and explanation.
 - Supporting citations.
-- Recommended action: `reply`, `request_refund_review`, `escalate`, or `needs_human_review`.
+- Recommended action: `reply`, `request_refund_review`, or `needs_human_review`.
 
 ### 7.3 Evidence inspection
 
@@ -101,7 +107,7 @@ For `request_refund_review`, the application displays the proposed tool argument
 
 ### 7.5 Evaluation view
 
-The repository provides an evaluation command. A minimal UI or generated report displays:
+The repository provides a CLI evaluation command and a local-only `/admin/evaluations` console. The console runs evaluations, retains a safe compact history in PostgreSQL, compares compatible baseline/candidate runs, and displays:
 
 - Classification accuracy.
 - Schema-valid response rate.
@@ -110,6 +116,8 @@ The repository provides an evaluation command. A minimal UI or generated report 
 - Latency distribution.
 - Token usage and estimated cost, when pricing configuration is available.
 - Failed cases with expected and actual results.
+
+The console and `/api/evaluations/**` routes are disabled by default in production. Complete downloadable reports exist only in the active browser tab or the requested CLI output path; persisted history excludes ticket text, generated drafts, source excerpts, prompts, vectors, credentials, and provider payloads.
 
 ## 8. Functional requirements
 
@@ -133,9 +141,9 @@ The system must instruct the model to use only retrieved context for policy or f
 
 If evidence is insufficient or contradictory, the system must return `needs_human_review` with a short explanation.
 
-### FR-6: Tool calling
+### FR-6: Controlled action proposal
 
-The system must expose one mock tool, `requestRefundReview`. Tool arguments must be schema-validated and execution must require explicit user confirmation.
+The system must expose one mock action boundary, `requestRefundReview`. The model may select only the corresponding structured action; it does not dynamically select or execute a tool. The server constructs and validates the arguments, persists a session-owned pending proposal, and requires a separate explicit confirmation before idempotent mock execution.
 
 ### FR-7: Provider boundary
 
@@ -143,11 +151,11 @@ Application logic must use an internal model-provider interface. Provider-specif
 
 ### FR-8: Evaluations
 
-The project must include a version-controlled golden dataset and a repeatable evaluation runner. The command must exit non-zero when configured regression thresholds fail.
+The project must include a version-controlled golden dataset and a repeatable evaluation runner shared by the CLI and local-only console. Validated safe aggregate and compact per-case records must persist for history and compatible-run comparison. The command must exit non-zero when configured regression thresholds fail.
 
 ### FR-9: Observability
 
-Each request must receive a trace ID. Model and retrieval steps must record structured telemetry without requiring raw customer text in logs.
+Each request must receive a trace ID. Model and retrieval steps must record structured telemetry without raw customer text. Ticket resolution may additionally export an optional, fail-open metadata-only OpenTelemetry trace to Langfuse; Pino logs and PostgreSQL remain the operational and durable systems of record.
 
 ### FR-10: Error handling
 
@@ -157,8 +165,8 @@ The interface must distinguish retryable provider errors, invalid requests, vali
 
 The repository will contain synthetic data only:
 
-- 8–12 Markdown knowledge-base documents covering billing, account access, subscriptions, refunds, and common technical issues.
-- 30–50 evaluation tickets including common cases, edge cases, prompt-injection attempts, ambiguous requests, and unanswerable questions.
+- 8 synthetic Markdown knowledge-base documents covering billing, account access, subscriptions, refunds, incidents, and common technical issues.
+- 36 versioned evaluation tickets including common cases, edge cases, prompt-injection attempts, ambiguous requests, and unanswerable questions.
 - Expected categories, priorities, allowed actions, relevant source IDs, and whether the system should abstain.
 
 No real customer data or secrets may be committed.
@@ -177,7 +185,7 @@ No real customer data or secrets may be committed.
 - A user can reach a resolution proposal from the home screen in one submission.
 - Sources are visible beside the proposed response, not hidden in a secondary workflow.
 - Loading, abstention, validation failure, provider failure, and tool-confirmation states are distinct.
-- The interface remains usable without streaming; streaming is an optional enhancement.
+- The V1 interface is non-streaming and remains usable throughout its loading and terminal states.
 
 ## 12. Metrics
 
@@ -188,7 +196,7 @@ No real customer data or secrets may be committed.
 - Citation precision: cited chunks that support the generated claim.
 - Answer completeness against the evaluation rubric.
 - Abstention precision and recall.
-- Tool selection accuracy.
+- Action selection accuracy.
 
 ### Operational
 
@@ -227,7 +235,7 @@ No real customer data or secrets may be committed.
 
 ## 14. Acceptance criteria
 
-The MVP is complete when:
+The V1 feature scope is complete when:
 
 1. A fresh installation can seed the knowledge base and database using documented commands.
 2. A user can submit each sample ticket and receive a schema-valid result.
@@ -238,12 +246,14 @@ The MVP is complete when:
 7. The README reports measured results and known failure cases.
 8. Automated tests cover schemas, chunking, retrieval filters, tool authorization, and error behavior.
 
+The V1 product surface, safety controls, persistence, evaluation tooling, and deterministic coverage are implemented. Live-model acceptance is not fully met: the newest run includes schema failures and misses several configured quality thresholds, so the current measured regression is not represented as a passing V1 quality baseline.
+
 ## 15. Future possibilities
 
 - Hybrid keyword and vector retrieval.
 - Reranking and retrieval-quality evaluations.
-- Multiple model providers and model routing.
-- Agent feedback captured as evaluation candidates.
+- A single bounded ticket-investigation agent over validated read-only synthetic tools, as defined by an approved V2 PRD.
+- Agent feedback captured as evaluation candidates after explicit review.
 - Multi-tenant document isolation.
 - Real help-desk integration in read-only mode.
 - Conversation history with explicit server-owned state.

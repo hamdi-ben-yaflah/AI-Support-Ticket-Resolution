@@ -5,13 +5,13 @@ You are a principal-level engineer building AI Support Ticket Resolution Copilot
 ## 1. Workflow
 
 1. Read this file completely before inspecting or changing the repository.
-2. Read every task-relevant `SKILL.md` named by the active prompt or agent environment; use the `openai-docs` skill for OpenAI embedding work when available, and read the relevant guide in `node_modules/next/dist/docs/` before writing Next.js code. (proposed)
+2. Read every task-relevant `SKILL.md` named by the active prompt or agent environment; consult the current provider documentation before changing Anthropic generation or Voyage AI embedding code, and read the relevant guide in `node_modules/next/dist/docs/` before writing Next.js code. (proposed)
 3. Inspect the existing code, tests, configuration, and current Git diff before deciding what must change. (proposed)
 4. Ask a focused question only when the request remains genuinely ambiguous after inspecting the repository.
 5. Write an implementation plan to `prompts/<task-slug>.md`; do not overwrite an unrelated plan. (proposed)
 6. Ask for approval of that saved plan and stop before implementation.
 7. Implement only the approved plan; treat any added scope as a new plan requiring approval. (proposed)
-8. Run `pnpm lint`, `pnpm exec tsc --noEmit`, and `pnpm build`; when present and relevant, also run `pnpm test`, `pnpm ingest`, and `pnpm eval -- --concurrency=3 --output=artifacts/eval-results.json`. (proposed)
+8. Run `pnpm verify`; when relevant and explicitly configured, also run `pnpm test:integration`, `pnpm ingest`, and `pnpm eval -- --concurrency=3 --output=artifacts/eval-results.json`. (proposed)
 9. Share the commands run, their results, and exact manual test steps; never say only "it should work."
 
 ## 2. Product
@@ -24,10 +24,10 @@ In scope:
 - Submit ticket text with an optional `standard` or `premium` customer tier.
 - Classify category and priority, summarize the ticket, retrieve Markdown knowledge, and draft a cited response.
 - Abstain with `needs_human_review` when evidence is insufficient, contradictory, or unsupported.
-- Propose `reply`, `request_refund_review`, `escalate`, or `needs_human_review` actions.
+- Propose `reply`, `request_refund_review`, or `needs_human_review` actions.
 - Require explicit confirmation before an idempotent mock refund-review action creates an audit result.
 - Ingest the version-controlled synthetic Markdown knowledge base into PostgreSQL with pgvector.
-- Run version-controlled golden-dataset evaluations and produce console and JSON reports.
+- Run version-controlled golden-dataset evaluations from the CLI or local-only `/admin/evaluations` console, persist safe history, compare compatible runs, and produce console and JSON reports.
 - Record redacted traces, model metadata, token usage, latency, finish reason, retries, and validation results.
 
 Out of scope:
@@ -37,10 +37,10 @@ Out of scope:
 - Do not send messages to customers or represent a draft as sent or approved.
 - Do not execute real refunds, payments, subscription changes, account changes, or other external side effects.
 - Do not add model training, fine-tuning, prompt self-modification, or online learning. (proposed)
-- Do not add autonomous agent loops, dynamic tool execution, or open-ended tool selection. (proposed)
+- Do not add general-purpose autonomy, open-ended tool discovery, arbitrary execution, or multi-agent systems. The approved V2 direction permits only one application-controlled investigation agent with an enumerated read-only synthetic tool allowlist, strict argument/result validation, explicit step/time/token budgets, deterministic termination, and a separate human-confirmed path for mock mutations. (proposed)
 - Do not add another text-generation provider, provider routing, or automatic model fallback. (proposed)
 - Do not add arbitrary file uploads, non-Markdown ingestion, crawling, or a knowledge-base admin UI. (proposed)
-- Do not add an evaluation dashboard or `/evaluations` page; evaluation output is CLI and JSON only. (proposed)
+- Do not expose the implemented local-only `/admin/evaluations` console or its APIs in production, and do not expand it into a production analytics dashboard. (proposed)
 - Do not add streaming, chat history, follow-up conversations, or server-owned conversation memory. (proposed)
 - Do not add multi-tenancy, billing, analytics dashboards, multi-region deployment, or production scaling work. (proposed)
 - Do not persist raw ticket text, full prompts, or full provider responses. (proposed)
@@ -66,7 +66,7 @@ Use:
 - pgvector: vector storage and cosine-similarity retrieval inside PostgreSQL.
 - Drizzle ORM and Drizzle migrations: typed data access and schema evolution.
 - `@anthropic-ai/sdk`: structured text generation only. (proposed)
-- `openai`: embedding generation only. (proposed)
+- `voyageai`: embedding generation only. (proposed)
 - Vitest: deterministic unit and integration tests.
 - Pino-compatible logger: structured, redacted JSON telemetry.
 - Tailwind CSS 4: styling with project-owned React components. (proposed)
@@ -81,8 +81,8 @@ Do not use:
 - Do not use Pinecone, Weaviate, Qdrant, Chroma, Supabase Vector, or another vector store in place of pgvector. (proposed)
 - Do not use Supabase, Neon, Firebase, SQLite, or another hosted/database product in place of local PostgreSQL for the MVP. (proposed)
 - Do not use Yup, Valibot, Joi, io-ts, or handwritten boundary checks in place of Zod. (proposed)
-- Do not use `openai` for classification, resolution generation, judging, or text-generation fallback. (proposed)
-- Do not use `@anthropic-ai/sdk` for embeddings, direct tool execution, database access, retries outside the request deadline, or autonomous loops. (proposed)
+- Do not use `openai` for embeddings, classification, resolution generation, judging, or fallback. (proposed)
+- Do not use `@anthropic-ai/sdk` for embeddings, direct tool execution, database access, retries outside the request deadline, or general-purpose autonomous loops. The bounded V2 investigation loop, if implemented under an approved plan, remains application-owned above the provider adapter. (proposed)
 - Do not use LangChain, LlamaIndex, Vercel AI SDK orchestration, or OpenAI Agents SDK in place of the explicit provider-neutral pipeline. (proposed)
 - Do not use Jest in place of Vitest, Winston in place of Pino-compatible logging, or ad hoc `console` calls for application telemetry. (proposed)
 - Do not use shadcn/ui, Material UI, Chakra UI, styled-components, Emotion, CSS Modules, or another component/styling system in place of Tailwind and project-owned components. (proposed)
@@ -119,7 +119,7 @@ Never expose to the browser:
 
 Never run from the browser:
 
-- Anthropic or OpenAI SDK calls, embedding generation, retrieval queries, SQL, ingestion, evaluations, authoritative Zod validation, retry logic, or telemetry writes. (proposed)
+- Anthropic or Voyage AI SDK calls, embedding generation, retrieval queries, SQL, ingestion, evaluations, authoritative Zod validation, retry logic, or telemetry writes. (proposed)
 - Tool authorization, refund-review confirmation, mock action execution, citation ownership checks, or signed-session verification. (proposed)
 
 ## 8. Code standards

@@ -20,7 +20,7 @@
     "chunks:inspect": "NODE_OPTIONS=--conditions=react-server tsx scripts/inspect-chunks.ts",
     "eval": "NODE_OPTIONS=--conditions=react-server tsx scripts/eval.ts",
     "test:integration": "vitest run --config vitest.integration.config.mts --reporter=default --reporter=junit --outputFile=artifacts/integration-tests.xml",
-    "ci": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm db:check && pnpm test:coverage && pnpm build:operations && pnpm build"
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm db:check && pnpm test:coverage && pnpm build:operations && pnpm build"
   },
   "engines": {
     "node": ">=24 <25"

@@ -80,15 +80,27 @@ The page lists the 20 most recent runs and compares an explicit baseline with a 
 
 To make a meaningful comparison, run `pnpm db:migrate`, execute a baseline with the current versioned prompts and `LLM_MODEL`, change one versioned prompt implementation/version constant or `LLM_MODEL`, restart the app if needed, execute the candidate, then select both runs on `/admin/evaluations`. CLI and browser runs use the same persistence path.
 
-### Latest local live verification
+### Latest live workflow verification
 
-On 2026-09-12, `golden.v2` was run with `claude-sonnet-5`, `voyage-4`, `retrieval.v1`, `resolve.v4`, and `resolution-policy.v1` over all 36 cases at concurrency 3. The result was correctly reported as a regression and the CLI exited non-zero: schema validity 30.6% (11/36), category accuracy 30.6% (11/36), priority accuracy 22.2% (8/36), retrieval recall@5 0.0% (0/27), abstention accuracy 13.9% (5/36), P50 5,557 ms, and P95 6,657 ms. Citation support was unavailable because no grounded outcome reached citation judging. There were 25 sanitized case errors; local telemetry identified Voyage HTTP 429 rate limiting as the dominant cause. Pricing was not configured, so estimated cost remained `null`. This is one environment-specific measurement, not a product guarantee, and its raw ignored report is not checked in.
+On 2026-09-17, the manual [Live AI evaluation workflow](https://github.com/hamdi-ben-yaflah/AI-Support-Ticket-Resolution/actions/runs/35199161737) ran revision `c741a8eb653b56b3e8f11828a2f5bc0ad1b2767a` with `golden.v2`, `claude-sonnet-5`, the default `voyage-4` embeddings, `retrieval.v1`, `classify.v1`, `resolve.v4`, `citation-judge.v1`, and `resolution-policy.v1` over all 36 cases at concurrency 3. It correctly reported a regression and exited non-zero. Threshold results were:
 
-Three representative failure analyses:
+| Metric              | Actual        | Threshold | Result |
+| ------------------- | ------------- | --------- | ------ |
+| Schema validity     | 94.4% (34/36) | 100%      | Fail   |
+| Category accuracy   | 94.4% (34/36) | 90%       | Pass   |
+| Retrieval recall@5  | 3.7% (1/27)   | 90%       | Fail   |
+| Citation support    | 100% (1/1)    | 85%       | Pass   |
+| Abstention accuracy | 30.6% (11/36) | 85%       | Fail   |
 
-- `eval-billing-duplicate-settled` classified billing/medium correctly, but no chunk cleared the 0.65 similarity threshold. The pipeline safely abstained, so action, abstention, and retrieval-recall grades failed without inventing policy.
-- `eval-adversarial-ignore-billing` produced a sanitized `retrieval_unavailable` case error after Voyage rate limiting. The runner continued and exposed the failure without ticket text or provider detail in the report.
-- `eval-contradictory-refund-date` correctly classified and abstained via low confidence, but still received zero retrieval recall because an expected-source case bypassed retrieval. This is intentional: early abstention cannot silently disappear from the retrieval denominator.
+Ungated diagnostics were priority accuracy 80.6% (29/36), action accuracy 30.6% (11/36), abstention precision 30.3% (10/33), abstention recall 90.9% (10/11), P50 2,176 ms, and P95 4,843 ms. The run recorded two sanitized `truncated` resolution errors, zero retries, and no configured pricing, so estimated cost remained `null`.
+
+The main limitation is retrieval: only one of 27 expected-source cases retrieved the expected source, and most otherwise schema-valid answerable cases safely abstained without evidence. The 100% citation-support result has a denominator of one and is therefore not a broad quality signal. The workflow run also predates the later provider-diagnostics and Anthropic structured-parse fixes, so a paid current-HEAD live rerun is still required before claiming a passing V1 quality baseline. The redacted workflow artifact is retained temporarily by GitHub Actions and is not committed; this summary includes no ticket text, prompts, drafts, source content, provider payloads, or secrets.
+
+Three representative safe case analyses:
+
+- `eval-billing-duplicate-settled` classified billing/medium correctly, but retrieved no qualifying source and safely abstained; action, abstention, and retrieval-recall grades failed without inventing policy.
+- `eval-billing-downgrade-timing` was the sole fully passing grounded case: it retrieved and cited the expected source, replied, and passed citation judging.
+- `eval-account-verification-boundary` and `eval-other-sql-request` ended with sanitized `truncated` resolution errors, accounting for both schema-validity failures.
 
 ## Commands
 
@@ -101,7 +113,7 @@ pnpm test
 pnpm test:coverage
 pnpm build
 pnpm build:operations
-pnpm ci
+pnpm verify
 pnpm db:generate
 pnpm db:check
 pnpm db:migrate
@@ -119,7 +131,7 @@ Pull requests run deterministic formatting, lint, type, migration-consistency, u
 
 The production container runs as a non-root user. Before starting Next.js it applies committed Drizzle migrations and idempotently ingests the synthetic Markdown knowledge base; failure keeps the replacement unhealthy so Dokploy can preserve or roll back to the previous task. Schema changes must use forward-compatible expand/contract migrations because application rollback never reverses database migrations.
 
-Live Anthropic/Voyage evaluation runs only from the manual/weekly **Live AI evaluation** workflow against a disposable pgvector database and uploads the existing redacted report. It is not a pull-request or production release gate.
+Live Anthropic/Voyage evaluation runs only from the manual-dispatch **Live AI evaluation** workflow against a disposable pgvector database and uploads the existing redacted report. It is not scheduled and is not a pull-request or production release gate.
 
 Follow [docs/operations/first-production-deploy.md](docs/operations/first-production-deploy.md) when you are ready to configure and trigger the first deployment. See [docs/operations/dokploy-deployment.md](docs/operations/dokploy-deployment.md) for the deeper backup/restore, hardening, diagnosis, credential-rotation, retention, and rollback procedures.
 
@@ -139,6 +151,8 @@ Follow [docs/operations/first-production-deploy.md](docs/operations/first-produc
 - `src/observability`: Pino redaction plus a typed metadata-only OpenTelemetry boundary and optional fail-open Langfuse exporter
 
 Provider SDK types and secrets stay server-side. The resolve response is a discriminated success: `action: "reply"` includes a bounded rationale, proposed draft, and compact citation metadata; `action: "request_refund_review"` is billing-only and adds validated display-safe arguments plus an opaque pending proposal ID; `action: "needs_human_review"` includes a bounded reason and deliberately omits a draft, citations, and action. The model never selects a tool name or executes code. `POST /api/actions/refund-review/:proposalId/confirm` requires exactly `{ "confirmed": true }`, the owning signed session, reparsed stored arguments, and evidence IDs owned by the same resolution. A row lock ensures first, repeated, and concurrent confirmations return one immutable stored mock result. Missing and cross-session proposals share the same non-revealing response, and all confirmation responses are private and non-cacheable.
+
+That constraint describes the implemented V1 pipeline. The approved V2 planning direction is limited to one application-owned, budget-bounded investigation agent over enumerated read-only synthetic tools; it does not permit general-purpose autonomy, dynamic tool discovery, multi-agent orchestration, arbitrary execution, or unconfirmed mutations.
 
 ## Manual verification
 
