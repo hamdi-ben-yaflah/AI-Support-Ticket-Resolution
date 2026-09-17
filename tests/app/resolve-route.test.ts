@@ -6,6 +6,7 @@ import { SessionConfigurationError } from "@/config/session";
 import type { RefundReviewResolutionProposal, ResolutionProposal } from "@/domain/grounded-reply";
 import type { ResolutionExecution } from "@/domain/resolution-run";
 import type { AppLogger } from "@/observability/logger";
+import { InMemoryTracing } from "@/observability/testing";
 import { RetrievalError } from "@/retrieval/errors";
 
 const traceId = "123e4567-e89b-42d3-a456-426614174000";
@@ -170,12 +171,14 @@ describe("POST /api/tickets/resolve", () => {
   });
 
   it("does not return a proposal when its source authorization context cannot be saved", async () => {
+    const tracing = new InMemoryTracing();
     const response = await createResolveHandler({
       resolve: vi.fn().mockResolvedValue(execution),
       persist: vi.fn().mockRejectedValue(new Error("database detail")),
       createSession: () => session,
       createTraceId: () => traceId,
       log: logger(),
+      tracing,
     })(request(JSON.stringify({ text: "I was charged for both plans." })));
 
     expect(response.status).toBe(503);
@@ -184,6 +187,15 @@ describe("POST /api/tickets/resolve", () => {
       error: { code: "internal_error", retryable: true },
     });
     expect(response.headers.get("set-cookie")).toBeNull();
+    expect(tracing.spans).toMatchObject([
+      { name: "support.ticket.resolve", errorCode: "internal_error" },
+      {
+        name: "support.resolution.persist",
+        parentId: "1",
+        errorCode: "persistence_error",
+        attributes: { "support.persistence.outcome": "failed" },
+      },
+    ]);
   });
 
   it("reuses an existing valid session without replacing its cookie", async () => {
@@ -295,6 +307,7 @@ describe("POST /api/tickets/resolve", () => {
     ["configuration", 500, "configuration_error", false],
     ["unexpected", 500, "internal_error", false],
   ])("maps %s failures to a safe response", async (code, status, apiCode, retryable) => {
+    const tracing = new InMemoryTracing();
     const resolve = vi
       .fn()
       .mockRejectedValue(
@@ -305,11 +318,17 @@ describe("POST /api/tickets/resolve", () => {
       createSession: () => session,
       createTraceId: () => traceId,
       log: logger(),
+      tracing,
     })(request(JSON.stringify({ text: "A valid ticket body" })));
     const body = await response.json();
     expect(response.status).toBe(status);
     expect(body).toMatchObject({ ok: false, traceId, error: { code: apiCode, retryable } });
     expect(JSON.stringify(body)).not.toContain("sensitive SDK detail");
+    expect(tracing.spans[0]?.attributes).toMatchObject({
+      "support.api.result_code": apiCode,
+      "support.retryable": retryable,
+    });
+    expect(JSON.stringify(tracing.spans)).not.toContain("sensitive SDK detail");
   });
 
   it.each([["unavailable", 503, "retrieval_unavailable", true]] as const)(

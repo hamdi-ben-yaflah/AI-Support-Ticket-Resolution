@@ -16,6 +16,7 @@ import { z } from "zod";
 
 import { LlmError } from "@/ai/errors";
 import type { GenerateRequest, GenerateResult, LlmProvider } from "@/ai/types";
+import { tracing, type AppTracing } from "@/observability/tracing";
 
 const AnthropicMessageSchema = z.object({
   id: z.string().min(1),
@@ -26,6 +27,7 @@ const AnthropicMessageSchema = z.object({
     input_tokens: z.number().int().nonnegative(),
     output_tokens: z.number().int().nonnegative(),
     cache_read_input_tokens: z.number().int().nonnegative().nullable().optional(),
+    cache_creation_input_tokens: z.number().int().nonnegative().nullable().optional(),
   }),
 });
 
@@ -42,6 +44,7 @@ type AnthropicProviderOptions = {
   maxRetries: number;
   client?: Anthropic;
   clock?: Partial<Clock>;
+  tracing?: AppTracing;
 };
 
 const defaultClock: Clock = {
@@ -73,6 +76,10 @@ function retryAfterMs(error: unknown, now: number): number | undefined {
 }
 
 function mapAnthropicError(error: unknown, retryCount: number): LlmError {
+  const providerMetadata =
+    error instanceof APIError
+      ? { providerRequestId: error.requestID ?? undefined, providerStatusCode: error.status }
+      : {};
   if (
     error instanceof APIConnectionTimeoutError ||
     error instanceof APIUserAbortError ||
@@ -82,6 +89,7 @@ function mapAnthropicError(error: unknown, retryCount: number): LlmError {
       retryable: true,
       retryCount,
       cause: error,
+      ...providerMetadata,
     });
   }
 
@@ -94,6 +102,7 @@ function mapAnthropicError(error: unknown, retryCount: number): LlmError {
       retryable: true,
       retryCount,
       cause: error,
+      ...providerMetadata,
     });
   }
 
@@ -107,6 +116,7 @@ function mapAnthropicError(error: unknown, retryCount: number): LlmError {
       retryable: false,
       retryCount,
       cause: error,
+      ...providerMetadata,
     });
   }
 
@@ -114,6 +124,7 @@ function mapAnthropicError(error: unknown, retryCount: number): LlmError {
     retryable: false,
     retryCount,
     cause: error,
+    ...providerMetadata,
   });
 }
 
@@ -136,6 +147,7 @@ export class AnthropicLlmProvider implements LlmProvider {
   private readonly timeoutMs: number;
   private readonly maxRetries: number;
   private readonly clock: Clock;
+  private readonly tracing: AppTracing;
 
   constructor(options: AnthropicProviderOptions) {
     this.model = options.model;
@@ -148,6 +160,7 @@ export class AnthropicLlmProvider implements LlmProvider {
         maxRetries: 0,
       });
     this.clock = { ...defaultClock, ...options.clock };
+    this.tracing = options.tracing ?? tracing;
   }
 
   async generateStructured<T>(request: GenerateRequest<T>): Promise<GenerateResult<T>> {
@@ -165,9 +178,10 @@ export class AnthropicLlmProvider implements LlmProvider {
       }
 
       const attemptTimeoutMs = Math.max(1, Math.floor(remainingMs));
+      const attemptStartedAt = this.clock.now();
 
       try {
-        const message = await this.client.messages.parse(
+        const pending = this.client.messages.parse(
           {
             model: this.model,
             max_tokens: request.maxOutputTokens,
@@ -186,12 +200,15 @@ export class AnthropicLlmProvider implements LlmProvider {
             timeout: attemptTimeoutMs,
           },
         );
+        const response = await pending.withResponse();
+        const message = response.data;
 
         const parsedMessage = AnthropicMessageSchema.safeParse(message);
         if (!parsedMessage.success) {
           throw new LlmError("invalid_output", "The model returned an invalid response.", {
             retryable: false,
             retryCount,
+            providerRequestId: response.request_id ?? undefined,
           });
         }
 
@@ -201,6 +218,7 @@ export class AnthropicLlmProvider implements LlmProvider {
             retryable: false,
             retryCount,
             finishReason,
+            providerRequestId: response.request_id ?? undefined,
           });
         }
 
@@ -209,6 +227,7 @@ export class AnthropicLlmProvider implements LlmProvider {
             retryable: false,
             retryCount,
             finishReason,
+            providerRequestId: response.request_id ?? undefined,
           });
         }
 
@@ -218,9 +237,16 @@ export class AnthropicLlmProvider implements LlmProvider {
             retryable: false,
             retryCount,
             finishReason,
+            providerRequestId: response.request_id ?? undefined,
           });
         }
 
+        this.tracing.getActiveSpan()?.setAttributes({
+          "support.provider_attempt_duration_ms": Math.max(0, this.clock.now() - attemptStartedAt),
+          "support.attempt": retryCount + 1,
+          "support.provider.request_id": response.request_id ?? undefined,
+          "support.provider.message_id": parsedMessage.data.id,
+        });
         return {
           value: value.data,
           model: parsedMessage.data.model,
@@ -234,14 +260,27 @@ export class AnthropicLlmProvider implements LlmProvider {
               : {
                   cachedInputTokens: parsedMessage.data.usage.cache_read_input_tokens,
                 }),
+            ...(parsedMessage.data.usage.cache_creation_input_tokens === null ||
+            parsedMessage.data.usage.cache_creation_input_tokens === undefined
+              ? {}
+              : {
+                  cacheWriteInputTokens: parsedMessage.data.usage.cache_creation_input_tokens,
+                }),
           },
           latencyMs: Math.max(0, this.clock.now() - startedAt),
           retryCount,
-          providerRequestId: parsedMessage.data.id,
+          ...(response.request_id ? { providerRequestId: response.request_id } : {}),
+          providerMessageId: parsedMessage.data.id,
         };
       } catch (error) {
         const mapped = error instanceof LlmError ? error : mapAnthropicError(error, retryCount);
+        this.tracing.getActiveSpan()?.setAttributes({
+          "support.provider_attempt_duration_ms": Math.max(0, this.clock.now() - attemptStartedAt),
+          "support.attempt": retryCount + 1,
+          "support.provider.request_id": mapped.providerRequestId,
+        });
         if (!isRetryable(mapped, retryCount, this.maxRetries)) {
+          this.tracing.getActiveSpan()?.fail(mapped.code);
           throw mapped;
         }
 
@@ -250,13 +289,22 @@ export class AnthropicLlmProvider implements LlmProvider {
         const delayMs = requestedDelay ?? exponentialDelay * (0.75 + this.clock.random() * 0.5);
 
         if (this.clock.now() + delayMs >= deadline) {
+          this.tracing.getActiveSpan()?.fail(mapped.code);
           throw new LlmError(mapped.code, mapped.message, {
             retryable: mapped.retryable,
             retryCount,
             cause: error,
+            providerRequestId: mapped.providerRequestId,
+            providerStatusCode: mapped.providerStatusCode,
           });
         }
 
+        this.tracing.getActiveSpan()?.addRetryEvent({
+          attempt: retryCount + 1,
+          retryCount: retryCount + 1,
+          delayMs,
+          errorCode: mapped.code,
+        });
         await this.clock.sleep(delayMs);
         retryCount += 1;
       }

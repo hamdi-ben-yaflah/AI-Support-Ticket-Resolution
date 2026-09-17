@@ -89,6 +89,20 @@ Reviewed runtime configuration:
 - `RETRIEVAL_MAXIMUM_CONTEXT_TOKENS=3500`
 - `RETRIEVAL_MINIMUM_EVIDENCE_COUNT=1`
 
+Optional Langfuse Cloud tracing:
+
+- `LANGFUSE_ENABLED=true`
+- `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` as encrypted values from one Langfuse project
+- `LANGFUSE_BASE_URL` for the selected Langfuse region (omit to use the SDK default)
+- `LANGFUSE_ENVIRONMENT=production`
+- `LANGFUSE_RELEASE=<deployed-commit-sha>`
+
+Leave all Langfuse values absent and `LANGFUSE_ENABLED=false` to disable export. Never configure
+only one credential. Tracing is diagnostic and fail-open; PostgreSQL records and Pino logs remain
+the operational systems of record. Follow the
+[Langfuse observability runbook](langfuse-observability.md) to verify metadata boundaries and
+investigate provider errors or latency.
+
 Leave evaluation pricing unset in production. `APP_VERSION`, `NODE_ENV`, `HOSTNAME`, `PORT`, and the secure evaluation default are stamped or set by the image and should not be overridden. `SKIP_KNOWLEDGE_INGESTION=true` exists only for provider-free container smoke tests; setting it in production can leave the knowledge base stale.
 
 ## 5. Health-gated replacement and rollback

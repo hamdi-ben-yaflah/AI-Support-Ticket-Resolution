@@ -10,6 +10,7 @@ import type {
   EmbeddingResult,
 } from "@/embeddings/types";
 import { logger, type AppLogger } from "@/observability/logger";
+import { tracing, withTraceCorrelation, type AppTracing } from "@/observability/tracing";
 
 const VoyageEmbeddingResponseSchema = z.object({
   model: z.string().min(1),
@@ -62,6 +63,7 @@ type VoyageEmbeddingProviderOptions = {
   client?: VoyageEmbeddingClient;
   clock?: Partial<Clock>;
   log?: AppLogger;
+  tracing?: AppTracing;
 };
 
 const defaultClock: Clock = {
@@ -262,6 +264,7 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
   private readonly maxRetries: number;
   private readonly clock: Clock;
   private readonly log: AppLogger;
+  private readonly tracing: AppTracing;
 
   constructor(options: VoyageEmbeddingProviderOptions) {
     this.model = options.model;
@@ -277,6 +280,7 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
       });
     this.clock = { ...defaultClock, ...options.clock };
     this.log = options.log ?? logger;
+    this.tracing = options.tracing ?? tracing;
   }
 
   async embed(
@@ -324,19 +328,30 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
           retryCount,
         );
         const latencyMs = Math.max(0, this.clock.now() - startedAt);
-        this.log.info({
-          event: "embedding_call",
-          traceId: metadata.traceId,
-          operation: metadata.operation,
-          inputType: metadata.inputType,
-          provider: this.name,
-          model: validated.model,
-          inputCount: texts.length,
-          inputTokens: validated.inputTokens,
-          latencyMs,
-          validationPassed: true,
-          retryCount,
+        this.tracing.getActiveSpan()?.setAttributes({
+          "support.embedding.token_count": validated.inputTokens,
+          "support.duration_ms": latencyMs,
+          "support.retry_count": retryCount,
+          "gen_ai.response.model": validated.model,
         });
+        this.log.info(
+          withTraceCorrelation(
+            {
+              event: "embedding_call",
+              traceId: metadata.traceId,
+              operation: metadata.operation,
+              inputType: metadata.inputType,
+              provider: this.name,
+              model: validated.model,
+              inputCount: texts.length,
+              inputTokens: validated.inputTokens,
+              latencyMs,
+              validationPassed: true,
+              retryCount,
+            },
+            this.tracing,
+          ),
+        );
 
         return {
           vectors: validated.vectors,
@@ -348,26 +363,41 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
       } catch (error) {
         const mapped = error instanceof EmbeddingError ? error : mapVoyageError(error, retryCount);
         if (!mapped.retryable || retryCount >= this.maxRetries) {
-          this.log.error({
-            event: "embedding_call",
-            traceId: metadata.traceId,
-            operation: metadata.operation,
-            inputType: metadata.inputType,
-            provider: this.name,
-            model: this.model,
-            inputCount: texts.length,
-            inputTokens: 0,
-            latencyMs: Math.max(0, this.clock.now() - startedAt),
-            validationPassed: false,
-            retryCount,
-            reason: mapped.code,
-            providerError: providerErrorDiagnostics(error),
-          });
+          this.tracing.getActiveSpan()?.fail(mapped.code);
+          this.log.error(
+            withTraceCorrelation(
+              {
+                event: "embedding_call",
+                traceId: metadata.traceId,
+                operation: metadata.operation,
+                inputType: metadata.inputType,
+                provider: this.name,
+                model: this.model,
+                inputCount: texts.length,
+                inputTokens: 0,
+                latencyMs: Math.max(0, this.clock.now() - startedAt),
+                validationPassed: false,
+                retryCount,
+                reason: mapped.code,
+                providerError: providerErrorDiagnostics(error),
+              },
+              this.tracing,
+            ),
+          );
           throw mapped;
         }
 
         const delayMs = retryDelayMs(error, retryCount);
-        if (this.clock.now() + delayMs >= deadline) throw mapped;
+        if (this.clock.now() + delayMs >= deadline) {
+          this.tracing.getActiveSpan()?.fail(mapped.code);
+          throw mapped;
+        }
+        this.tracing.getActiveSpan()?.addRetryEvent({
+          attempt: retryCount + 1,
+          retryCount: retryCount + 1,
+          delayMs,
+          errorCode: mapped.code,
+        });
         await this.clock.sleep(delayMs);
         retryCount += 1;
       }

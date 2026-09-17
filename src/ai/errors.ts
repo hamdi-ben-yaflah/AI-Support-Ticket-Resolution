@@ -11,6 +11,8 @@ type LlmErrorOptions = {
   retryable: boolean;
   retryCount?: number;
   finishReason?: string;
+  providerRequestId?: string;
+  providerStatusCode?: number;
   cause?: unknown;
 };
 
@@ -19,6 +21,8 @@ export class LlmError extends Error {
   readonly retryable: boolean;
   readonly retryCount: number;
   readonly finishReason?: string;
+  readonly providerRequestId?: string;
+  readonly providerStatusCode?: number;
 
   constructor(code: LlmErrorCode, message: string, options: LlmErrorOptions) {
     super(message, { cause: options.cause });
@@ -27,6 +31,8 @@ export class LlmError extends Error {
     this.retryable = options.retryable;
     this.retryCount = options.retryCount ?? 0;
     this.finishReason = options.finishReason;
+    this.providerRequestId = options.providerRequestId;
+    this.providerStatusCode = options.providerStatusCode;
   }
 }
 

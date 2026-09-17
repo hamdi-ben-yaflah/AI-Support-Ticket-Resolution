@@ -27,7 +27,10 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
+    "@langfuse/otel": "^5.11.1",
     "@next/env": "^16.3.4",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/sdk-node": "^0.222.0",
     "drizzle-orm": "^0.45.2",
     "gpt-tokenizer": "^4.0.0",
     "gray-matter": "^4.0.3",

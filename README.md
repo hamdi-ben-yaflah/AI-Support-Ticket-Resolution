@@ -39,6 +39,23 @@ Start the app:
 pnpm dev
 ```
 
+### Optional Langfuse tracing
+
+Ticket resolution can emit a metadata-only OpenTelemetry trace to Langfuse Cloud. Set
+`LANGFUSE_ENABLED=true`, both `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`, and optionally
+`LANGFUSE_BASE_URL`, `LANGFUSE_ENVIRONMENT`, and `LANGFUSE_RELEASE`. With tracing disabled or all
+credentials absent, the application uses OpenTelemetry's no-op provider. Partial credentials are
+invalid, and initialization/export failures are fail-open for ticket requests.
+
+The exported tree covers classification, query embedding, vector search, resolution, grounding
+validation, and persistence. It includes bounded timing, token, retry, model, validation,
+retrieval, and outcome metadata. It never includes ticket text, summaries, prompts, generated
+drafts, source identifiers/content, vectors, session or ticket hashes, cookies, action arguments,
+credentials, raw provider bodies, exception messages, or stack traces. Search Langfuse span
+attributes for `support.trace_id` using the UUID displayed by the application. See the
+[Langfuse operations guide](docs/operations/langfuse-observability.md) for setup and incident
+checks.
+
 Open [http://localhost:3000](http://localhost:3000). Use synthetic tickets only; ticket text is sent to Anthropic for classification and, when confidence and retrieval permit, grounded resolution. It is never written to application telemetry or storage. Successful runs retain only a keyed ticket hash, redacted model metadata, the validated classification/action, and immutable snapshots of cited chunks for grounded outcomes. Refund-review outcomes atomically add an opaque `pending_confirmation` audit row. Successful abstentions retain no cited-source rows.
 
 ## Evaluation suite
@@ -119,6 +136,7 @@ Follow [docs/operations/first-production-deploy.md](docs/operations/first-produc
 - `src/db`: Drizzle schema, PostgreSQL client, migration-backed persistence, cosine search, document replacement, deterministic chunk inspection, successful resolution/cited-source/pending-action transactions, row-locked idempotent mock confirmation, and transactional evaluation run/case history
 - `src/config`: lazy server-only environment validation
 - `src/auth`: anonymous signed HTTP-only session creation/verification and keyed one-way session/ticket hashes
+- `src/observability`: Pino redaction plus a typed metadata-only OpenTelemetry boundary and optional fail-open Langfuse exporter
 
 Provider SDK types and secrets stay server-side. The resolve response is a discriminated success: `action: "reply"` includes a bounded rationale, proposed draft, and compact citation metadata; `action: "request_refund_review"` is billing-only and adds validated display-safe arguments plus an opaque pending proposal ID; `action: "needs_human_review"` includes a bounded reason and deliberately omits a draft, citations, and action. The model never selects a tool name or executes code. `POST /api/actions/refund-review/:proposalId/confirm` requires exactly `{ "confirmed": true }`, the owning signed session, reparsed stored arguments, and evidence IDs owned by the same resolution. A row lock ensures first, repeated, and concurrent confirmations return one immutable stored mock result. Missing and cross-session proposals share the same non-revealing response, and all confirmation responses are private and non-cacheable.
 
