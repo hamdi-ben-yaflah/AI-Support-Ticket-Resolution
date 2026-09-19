@@ -95,7 +95,9 @@ test.beforeAll(async () => {
 
 test.afterAll(cleanup);
 
-test("enforces session ownership for persisted source and action data", async ({ browser }) => {
+test("Rejects source access and refund confirmation from a different session", async ({
+  browser,
+}) => {
   const owner = await browser.newContext();
   const other = await browser.newContext();
   await owner.addCookies([sessionCookie(ownerSessionId)]);
@@ -134,7 +136,7 @@ test("enforces session ownership for persisted source and action data", async ({
   await other.close();
 });
 
-test("persists one logical audit result for repeated confirmation", async ({ browser }) => {
+test("Persists one audit result when refund confirmation is repeated", async ({ browser }) => {
   const owner = await browser.newContext();
   await owner.addCookies([sessionCookie(ownerSessionId)]);
   const page = await owner.newPage();

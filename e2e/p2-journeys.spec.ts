@@ -5,8 +5,10 @@ import { createApiFixtureHarness } from "./support/api-fixtures";
 const firstTicket = "I was charged twice for the same billing period.";
 const secondTicket = "My subscription renewal is not showing in the account.";
 
-test.describe("P2 support-desk journeys", () => {
-  test("prevents duplicate resolution submissions while processing", async ({ page }) => {
+test.describe("P2 support desk journeys", () => {
+  test("Prevents duplicate resolution submissions while a ticket is processing", async ({
+    page,
+  }) => {
     const fixtures = createApiFixtureHarness();
     let resolutionRequests = 0;
     await page.route("**/api/tickets/resolve", async (route) => {
@@ -29,7 +31,7 @@ test.describe("P2 support-desk journeys", () => {
     expect(resolutionRequests).toBe(1);
   });
 
-  test("clears the previous proposal when ticket input changes", async ({ page }) => {
+  test("Clears the previous proposal when the ticket text changes", async ({ page }) => {
     const fixtures = createApiFixtureHarness();
     await fixtures.routeResolution(page, fixtures.fixtures.resolution.reply);
     await page.route("**/api/sources/**", async (route) => {

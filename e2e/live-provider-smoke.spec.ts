@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("resolves one synthetic ticket through the live provider path", async ({ page }) => {
+test("Resolves one synthetic ticket through the live provider path", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("Ticket text").fill("I was charged twice for the same billing period.");
   await page.getByRole("button", { name: "Resolve ticket" }).click();
