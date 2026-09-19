@@ -1,5 +1,7 @@
 import "server-only";
 
+import { z } from "zod";
+
 import {
   context,
   ROOT_CONTEXT,
@@ -113,10 +115,70 @@ export interface AppTracing {
   getActiveCorrelation(): TraceCorrelation | undefined;
 }
 
+const SAFE_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
+  "langfuse.observation.type",
+  "support.trace_id",
+  "support.task",
+  "support.operation",
+  "support.prompt.version",
+  "support.policy.version",
+  "support.retrieval.version",
+  "support.deployment.revision",
+  "gen_ai.provider.name",
+  "gen_ai.request.model",
+  "gen_ai.response.model",
+  "gen_ai.usage.input_tokens",
+  "gen_ai.usage.output_tokens",
+  "support.usage.cached_input_tokens",
+  "support.usage.cache_write_tokens",
+  "support.provider.request_id",
+  "support.provider.message_id",
+  "support.provider.status_code",
+  "support.finish_reason",
+  "support.attempt",
+  "support.retry_count",
+  "support.duration_ms",
+  "support.provider_attempt_duration_ms",
+  "support.validation.passed",
+  "support.validation.outcome",
+  "support.outcome",
+  "support.api.result_code",
+  "support.retryable",
+  "support.category",
+  "support.priority",
+  "support.confidence",
+  "support.action",
+  "support.abstention.reason_code",
+  "support.citation_count",
+  "support.embedding.input_type",
+  "support.embedding.input_count",
+  "support.embedding.dimensions",
+  "support.embedding.token_count",
+  "support.retrieval.category_filter",
+  "support.retrieval.fallback_used",
+  "support.retrieval.candidate_count",
+  "support.retrieval.selected_count",
+  "support.retrieval.minimum_similarity",
+  "support.retrieval.maximum_context_tokens",
+  "support.retrieval.context_token_count",
+  "support.retrieval.similarities",
+  "support.persistence.outcome",
+  "error.type",
+]);
+
+const TraceAttributeValueSchema = z.union([
+  z.string().max(200),
+  z.number().finite(),
+  z.boolean(),
+  z.array(z.number().finite()).max(100),
+]);
+
 function definedAttributes(attributes: SafeTraceAttributes): Record<string, AttributeValue> {
   const result: Record<string, AttributeValue> = {};
   for (const [name, value] of Object.entries(attributes)) {
-    if (value !== undefined) result[name] = value;
+    if (!SAFE_ATTRIBUTE_NAMES.has(name)) continue;
+    const parsed = TraceAttributeValueSchema.safeParse(value);
+    if (parsed.success) result[name] = parsed.data;
   }
   return result;
 }
