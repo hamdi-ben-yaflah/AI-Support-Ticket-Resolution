@@ -12,9 +12,14 @@ import {
 import { isEvaluationSetupError } from "@/evals/errors";
 import { runConfiguredEvaluation } from "@/evals/service";
 import { logger, type AppLogger } from "@/observability/logger";
+import {
+  isLocalEvaluationRequest,
+  readGuardedJson,
+  requestGuardResponse,
+  SMALL_BODY_BYTES,
+} from "@/security/http";
 
 const EvaluationApiResultSchema = createApiResultSchema(EvaluationReportSchema);
-const MAX_REQUEST_BYTES = 1_024;
 
 type EvaluationRunner = (concurrency: number) => Promise<EvaluationReport>;
 
@@ -60,33 +65,14 @@ export function createEvaluationRunHandler(dependencies: HandlerDependencies = {
   let active = false;
 
   return async function POST(request: Request): Promise<Response> {
-    if (!isEnabled()) return disabledResponse();
+    if (!isLocalEvaluationRequest(request) || !isEnabled()) return disabledResponse();
 
     const traceId = createTraceId();
-    if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
-      return failure(
-        traceId,
-        415,
-        "invalid_request",
-        "Content-Type must be application/json.",
-        false,
-      );
-    }
-    const contentLength = Number(request.headers.get("content-length"));
-    if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BYTES) {
-      return failure(traceId, 413, "invalid_request", "Request body is too large.", false);
-    }
-
-    let raw: string;
     let body: unknown;
     try {
-      raw = await request.text();
-      if (new TextEncoder().encode(raw).byteLength > MAX_REQUEST_BYTES) {
-        return failure(traceId, 413, "invalid_request", "Request body is too large.", false);
-      }
-      body = JSON.parse(raw);
-    } catch {
-      return failure(traceId, 400, "invalid_request", "Request body must be valid JSON.", false);
+      body = await readGuardedJson(request, SMALL_BODY_BYTES);
+    } catch (error) {
+      return requestGuardResponse(error, traceId);
     }
 
     const input = EvaluationRunRequestSchema.safeParse(body);

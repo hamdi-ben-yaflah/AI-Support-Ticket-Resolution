@@ -12,6 +12,7 @@ import {
   type MockRefundReviewResult,
 } from "@/domain/refund-review";
 import { logger, type AppLogger } from "@/observability/logger";
+import { readGuardedJson, requestGuardResponse, SMALL_BODY_BYTES } from "@/security/http";
 
 const ProposalIdSchema = z.string().uuid();
 const ConfirmationResultSchema = createApiResultSchema(MockRefundReviewResultSchema);
@@ -99,15 +100,15 @@ export function createRefundReviewConfirmationHandler(dependencies: HandlerDepen
 
     let body: unknown;
     try {
-      body = await request.json();
-    } catch {
+      body = await readGuardedJson(request, SMALL_BODY_BYTES);
+    } catch (error) {
       log.warn({
         event: "refund_review_confirmation_rejected",
         traceId,
         proposalId: proposalId.data,
-        reason: "malformed_json",
+        reason: "request_security",
       });
-      return invalidRequest(traceId, "Request body must be valid JSON.");
+      return requestGuardResponse(error, traceId);
     }
     if (!RefundReviewConfirmationSchema.safeParse(body).success) {
       log.warn({

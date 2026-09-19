@@ -68,7 +68,8 @@ Required secrets:
 
 Required production controls:
 
-- `ENABLE_LIVE_EVALUATIONS=false`
+- `APP_ORIGIN=https://your-public-domain.example` (exact public origin; no path or trailing slash)
+- `ENABLE_LIVE_EVALUATIONS=false` (production always disables HTTP evaluations, even if set to true)
 - `SKIP_KNOWLEDGE_INGESTION=false`
 
 Reviewed runtime configuration:
@@ -147,7 +148,7 @@ Database migrations must be forward-compatible expand/contract changes. Applicat
 1. Add the production domain to the Application and route it to port 3000.
 2. Enable automatic TLS and HTTP-to-HTTPS redirect.
 3. Add a Traefik secure-headers middleware with HSTS only after HTTPS is confirmed for the domain and all intended subdomains.
-4. Add a conservative source rate limit. AI requests can be slow, so begin with measured traffic and avoid a burst value that blocks legitimate retries.
+4. Configure the resolution route rate limit and request body/read limits using [AI security controls](ai-security.md). The application defaults to 20 resolutions/minute and 2 active resolutions per process; edge limits remain necessary. Verify provider-account spending limits and alerts separately.
 5. Confirm `/api/health/live` and `/api/health/ready` remain lightweight enough for monitors.
 6. Verify `/admin/evaluations`, `/api/evaluations/run`, `/api/evaluations/runs`, and `/api/evaluations/compare` all return 404 publicly.
 

@@ -8,14 +8,14 @@ describe("deployment configuration", () => {
     expect(isLiveEvaluationEnabled({ NODE_ENV: "test" })).toBe(true);
   });
 
-  it("disables live evaluations by default in production and supports explicit enablement", () => {
+  it("disables live evaluations unconditionally in production", () => {
     expect(isLiveEvaluationEnabled({ NODE_ENV: "production" })).toBe(false);
     expect(
       isLiveEvaluationEnabled({
         NODE_ENV: "production",
         ENABLE_LIVE_EVALUATIONS: "true",
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("validates health-safe versions and bounded readiness timeouts", () => {

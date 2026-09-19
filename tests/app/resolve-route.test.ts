@@ -8,6 +8,7 @@ import type { ResolutionExecution } from "@/domain/resolution-run";
 import type { AppLogger } from "@/observability/logger";
 import { InMemoryTracing } from "@/observability/testing";
 import { RetrievalError } from "@/retrieval/errors";
+import { createAdmissionController } from "@/security/admission";
 
 const traceId = "123e4567-e89b-42d3-a456-426614174000";
 const chunkId = "223e4567-e89b-42d3-a456-426614174000";
@@ -349,6 +350,34 @@ describe("POST /api/tickets/resolve", () => {
       expect(JSON.stringify(body)).not.toContain("sensitive database detail");
     },
   );
+
+  it("records a rate-limited rejection like every other rejection path", async () => {
+    const tracing = new InMemoryTracing();
+    const admission = createAdmissionController({
+      limits: { requestsPerMinute: 0, maxConcurrent: 1, sessionRequestsPerMinute: 1 },
+    });
+    const resolve = vi.fn();
+    const response = await createResolveHandler({
+      admission,
+      resolve,
+      createSession: () => session,
+      createTraceId: () => traceId,
+      log: logger(),
+      tracing,
+    })(request(JSON.stringify({ text: "A valid ticket body" })));
+
+    expect(response.status).toBe(429);
+    expect(resolve).not.toHaveBeenCalled();
+    expect(tracing.spans[0]).toMatchObject({
+      errorCode: "rate_limited",
+      attributes: {
+        "support.api.result_code": "rate_limited",
+        "support.outcome": "rejected",
+        "support.retryable": true,
+      },
+    });
+    expect(tracing.spans[0]?.attributes).toHaveProperty("support.duration_ms");
+  });
 
   it("does not expose a leaked internal insufficient-evidence error as a normal abstention", async () => {
     const resolve = vi.fn().mockRejectedValue(

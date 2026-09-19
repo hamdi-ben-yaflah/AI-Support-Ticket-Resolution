@@ -41,8 +41,10 @@ type RefundActionState =
       retryable: boolean;
     };
 
-const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
+const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   invalid_request: "The ticket input was rejected. Check its length and customer tier.",
+  rate_limited: "Too many resolution requests are in flight. Wait a moment and try again.",
+  request_timeout: "The request did not arrive in time. Check your connection and try again.",
   provider_timeout: "The model took too long to respond. You can try this ticket again.",
   provider_unavailable: "The model service is temporarily unavailable. You can try again.",
   retrieval_unavailable: "Knowledge retrieval is temporarily unavailable. You can try again.",
@@ -54,6 +56,8 @@ const ERROR_MESSAGES: Partial<Record<ApiErrorCode, string>> = {
   action_not_found: "This mock proposal is not available for the current session.",
   action_unavailable: "The mock action is temporarily unavailable. You can retry it.",
   configuration_error: "The resolution service is not configured. Contact an engineer.",
+  evaluation_not_found: "That evaluation run is not available.",
+  evaluation_incompatible: "Those evaluation runs cannot be compared.",
   internal_error: "Something unexpected prevented resolution. Contact an engineer.",
 };
 
@@ -454,7 +458,7 @@ export function TicketResolutionForm() {
             <p className="text-sm font-semibold text-[#8f312b]">Resolution not available</p>
             <p className="mt-1 text-sm leading-6 text-[#854d48]">
               {state.code
-                ? (ERROR_MESSAGES[state.code] ?? ERROR_MESSAGES.internal_error)
+                ? ERROR_MESSAGES[state.code]
                 : "The response could not be verified. Check your connection and try again."}
             </p>
             {state.traceId && (
@@ -742,7 +746,7 @@ function RefundReviewControls({
           <p className="font-semibold">Mock action not recorded</p>
           <p className="mt-1 leading-6">
             {actionState.code
-              ? (ERROR_MESSAGES[actionState.code] ?? ERROR_MESSAGES.internal_error)
+              ? ERROR_MESSAGES[actionState.code]
               : "The confirmation response could not be verified."}
           </p>
           {actionState.traceId && (
