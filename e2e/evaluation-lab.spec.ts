@@ -57,7 +57,7 @@ test.describe("P1 evaluation lab journeys", () => {
     await expect(page.getByRole("button", { name: /running evaluation/i })).toBeDisabled();
     await expect(page.getByText("Regression detected")).toBeVisible();
     await expect(page.getByText(`Run ${fixtures.report.runId}`)).toBeVisible();
-    await expect(page.getByText("P95 latency")).toBeVisible();
+    await expect(page.getByText("P95 latency", { exact: true })).toBeVisible();
     await expect(page.getByText("Case inspection")).toBeVisible();
 
     const download = page.waitForEvent("download");
