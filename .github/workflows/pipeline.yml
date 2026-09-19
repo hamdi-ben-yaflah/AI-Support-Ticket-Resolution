@@ -185,6 +185,12 @@ jobs:
           CI: true
           ENABLE_LIVE_EVALUATIONS: "false"
         run: pnpm test:e2e:database
+      - name: Build production browser target
+        run: pnpm build
+      - name: Run production security browser checks
+        env:
+          CI: true
+        run: pnpm exec playwright test --config playwright.security.config.ts
       - name: Upload Playwright report and test artifacts
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -269,7 +275,8 @@ jobs:
             --publish 3000:3000 \
             --env APP_VERSION="${GITHUB_SHA}" \
             --env DATABASE_URL=postgresql://support_copilot_container:support_copilot_container@host.docker.internal:5432/support_copilot_container_test \
-            --env ENABLE_LIVE_EVALUATIONS=false \
+            --env ENABLE_LIVE_EVALUATIONS=true \
+            --env APP_ORIGIN=http://127.0.0.1:3000 \
             --env SKIP_KNOWLEDGE_INGESTION=true \
             "${IMAGE_TAG}"
 
@@ -291,6 +298,7 @@ jobs:
           curl --fail --silent --show-error --max-time 10 http://127.0.0.1:3000/ >/dev/null
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/admin/evaluations)" = 404
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/evaluations/runs)" = 404
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/evaluations/compare)" = 404
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' --request POST --header 'Content-Type: application/json' --data '{"concurrency":3}' http://127.0.0.1:3000/api/evaluations/run)" = 404
       - name: Prepare vulnerability evidence
         run: mkdir -p artifacts

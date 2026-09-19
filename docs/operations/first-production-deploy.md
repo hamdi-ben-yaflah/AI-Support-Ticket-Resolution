@@ -77,6 +77,7 @@ DATABASE_URL=<internal-postgresql-url-from-step-2>
 SESSION_COOKIE_SECRET=<random-value-at-least-32-characters>
 LLM_MODEL=<anthropic-model-id>
 
+APP_ORIGIN=https://your-public-domain.example
 ENABLE_LIVE_EVALUATIONS=false
 SKIP_KNOWLEDGE_INGESTION=false
 
@@ -104,6 +105,8 @@ LANGFUSE_BASE_URL=
 LANGFUSE_ENVIRONMENT=production
 LANGFUSE_RELEASE=
 ```
+
+Set `APP_ORIGIN` to the exact real public origin, with no path or trailing slash. Follow [AI security controls](ai-security.md) for edge limits, browser headers, and provider spend checks. Production HTTP evaluations cannot be enabled by the flag.
 
 Do not override `APP_VERSION`, `NODE_ENV`, `HOSTNAME`, or `PORT`; the image supplies them.
 
