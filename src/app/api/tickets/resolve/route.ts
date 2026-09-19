@@ -24,6 +24,7 @@ import {
   type NormalizedTraceErrorCode,
 } from "@/observability/tracing";
 import { isRetrievalError } from "@/retrieval/errors";
+import { createAdmissionController } from "@/security/admission";
 import {
   PRIVATE_NO_STORE,
   readGuardedJson,
@@ -34,6 +35,7 @@ import {
 type Resolver = (input: TicketInput, context: ResolutionContext) => Promise<ResolutionExecution>;
 
 type HandlerDependencies = {
+  admission?: ReturnType<typeof createAdmissionController>;
   resolve?: Resolver;
   createSession?: (request: Request, ticketText: string) => ResolutionSession;
   persist?: (run: PersistedResolutionRun) => Promise<void>;
@@ -189,6 +191,7 @@ function normalizedTraceError(code: ApiErrorCode): NormalizedTraceErrorCode {
 }
 
 export function createResolveHandler(dependencies: HandlerDependencies = {}) {
+  const admission = dependencies.admission ?? createAdmissionController();
   const resolve = dependencies.resolve ?? resolveTicketWithConfiguredProviders;
   const createSession = dependencies.createSession ?? getOrCreateResolutionSession;
   const persist = dependencies.persist ?? persistSuccessfulResolution;
@@ -258,8 +261,25 @@ export function createResolveHandler(dependencies: HandlerDependencies = {}) {
           });
         }
 
+        let release: (() => void) | undefined;
         try {
           const session = createSession(request, input.data.text);
+          const permit = admission.acquire(session.cookie ? undefined : session.sessionHash);
+          if (!permit.allowed) {
+            rootSpan.setAttributes({
+              "support.api.result_code": "rate_limited",
+              "support.outcome": "rejected",
+            });
+            const response = failure(traceId, {
+              status: 429,
+              code: "rate_limited",
+              message: `Too many resolution requests. Try again in ${permit.retryAfter} seconds.`,
+              retryable: true,
+            });
+            response.headers.set("Retry-After", String(permit.retryAfter));
+            return response;
+          }
+          release = permit.release;
           const execution = ResolutionExecutionSchema.parse(await resolve(input.data, { traceId }));
           await appTracing.withSpan(
             "support.resolution.persist",
@@ -358,6 +378,8 @@ export function createResolveHandler(dependencies: HandlerDependencies = {}) {
             ),
           );
           return failure(traceId, responseError);
+        } finally {
+          release?.();
         }
       },
     );
