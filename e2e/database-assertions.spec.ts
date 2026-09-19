@@ -19,8 +19,8 @@ import {
 const traceId = "a1111111-1111-4111-8111-111111111111";
 const proposalId = "a2222222-2222-4222-8222-222222222222";
 const chunkId = "a3333333-3333-4333-8333-333333333333";
-const ownerSessionId = "owner-session-for-e2e-database";
-const otherSessionId = "other-session-for-e2e-database";
+const ownerSessionId = "a".repeat(43);
+const otherSessionId = "b".repeat(43);
 const ticketHash = "b".repeat(64);
 const reason = "Synthetic evidence supports a refund review.";
 const summary = "Synthetic duplicate charge for database-backed browser coverage.";

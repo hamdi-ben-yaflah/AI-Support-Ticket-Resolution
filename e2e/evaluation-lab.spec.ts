@@ -73,14 +73,15 @@ test.describe("P1 evaluation lab journeys", () => {
     await page.getByRole("button", { name: "Run evaluation" }).click();
     await expect(page.getByText("Regression detected")).toBeVisible();
     await expect(page.getByText("30 of 30 cases")).toBeVisible();
-    await expect(page.getByRole("button", { name: "All cases" })).toHaveAttribute(
+    const caseFilter = page.getByLabel("Case filter", { exact: true });
+    await expect(caseFilter.getByRole("button", { name: "All cases" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
 
-    await page.getByRole("button", { name: "Failed cases" }).click();
+    await caseFilter.getByRole("button", { name: "Failed cases" }).click();
     await expect(page.getByText("1 of 30 cases")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Failed cases" })).toHaveAttribute(
+    await expect(caseFilter.getByRole("button", { name: "Failed cases" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
@@ -97,22 +98,23 @@ test.describe("P1 evaluation lab journeys", () => {
     await expect(page.getByText("+10")).toBeVisible();
     await expect(page.getByText("Case changes")).toBeVisible();
 
-    await expect(page.getByRole("button", { name: "Regressed" })).toHaveAttribute(
+    const comparisonFilter = page.getByLabel("Comparison case filter", { exact: true });
+    await expect(comparisonFilter.getByRole("button", { name: "Regressed" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    await page.getByRole("button", { name: "Improved" }).click();
-    await expect(page.getByRole("button", { name: "Improved" })).toHaveAttribute(
+    await comparisonFilter.getByRole("button", { name: "Improved" }).click();
+    await expect(comparisonFilter.getByRole("button", { name: "Improved" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    await page.getByRole("button", { name: "All changed" }).click();
-    await expect(page.getByRole("button", { name: "All changed" })).toHaveAttribute(
+    await comparisonFilter.getByRole("button", { name: "All changed" }).click();
+    await expect(comparisonFilter.getByRole("button", { name: "All changed" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    await page.getByRole("button", { name: "All cases" }).click();
-    await expect(page.getByRole("button", { name: "All cases" })).toHaveAttribute(
+    await comparisonFilter.getByRole("button", { name: "All cases" }).click();
+    await expect(comparisonFilter.getByRole("button", { name: "All cases" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
