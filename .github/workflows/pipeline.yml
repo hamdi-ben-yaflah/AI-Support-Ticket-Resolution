@@ -178,7 +178,7 @@ jobs:
       - name: Run Playwright browser tests
         env:
           CI: true
-          ENABLE_LIVE_EVALUATIONS: "false"
+          ENABLE_LIVE_EVALUATIONS: "true"
         run: pnpm test:e2e
       - name: Run database-backed browser assertions
         env:
