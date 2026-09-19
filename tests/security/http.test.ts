@@ -116,6 +116,21 @@ describe("origin and local-host boundaries", () => {
       );
     },
   );
+  it("compares against the addressed authority, not the framework request URL", () => {
+    // Next rewrites the dev request URL to a synthetic localhost authority, so the
+    // fallback has to use the host the client actually addressed.
+    const addressed = (host: string, origin: string) =>
+      new Request("http://localhost:3000/api/tickets/resolve", {
+        method: "POST",
+        headers: { "content-type": "application/json", host, origin },
+      });
+    expect(() =>
+      assertRequestOrigin(addressed("127.0.0.1:3101", "http://127.0.0.1:3101"), undefined),
+    ).not.toThrow();
+    expect(() =>
+      assertRequestOrigin(addressed("127.0.0.1:3101", "http://localhost:3101"), undefined),
+    ).toThrow("origin");
+  });
   it("accepts canonical origin and origin-less CLI, rejects browser requests without Origin", () => {
     expect(() =>
       assertRequestOrigin(

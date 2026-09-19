@@ -52,6 +52,14 @@ export function requestGuardResponse(error: unknown, traceId: string): Response 
   });
 }
 
+// Next rewrites the dev request URL to a synthetic `localhost` authority regardless of the
+// interface the client reached, so outside production the Host header is the only record of
+// what the browser actually addressed — and the only value its Origin can be compared against.
+function addressedOrigin(request: Request): string | undefined {
+  const host = request.headers.get("host");
+  return host ? `${new URL(request.url).protocol}//${host}` : undefined;
+}
+
 export function assertRequestOrigin(
   request: Request,
   configuredOrigin = getSecurityConfig().origin,
@@ -63,8 +71,8 @@ export function assertRequestOrigin(
   }
   // Origin-less CLI clients remain supported. This is CSRF protection, not bot authentication.
   if (supplied === null) return;
-  const expected = configuredOrigin ?? new URL(request.url).origin;
-  if (supplied === "null" || supplied !== expected) {
+  const expected = configuredOrigin ?? addressedOrigin(request);
+  if (supplied === "null" || expected === undefined || supplied !== expected) {
     throw new RequestGuardError(403, "Request origin is not allowed.");
   }
 }
@@ -135,10 +143,9 @@ export function isLoopbackHost(host: string | null): boolean {
   return LoopbackAuthoritySchema.safeParse(host).success;
 }
 
+// Only the Host header records the authority the client addressed; the request URL carries a
+// synthetic `localhost` in dev whatever interface it arrived on, so testing it proves nothing.
 export function isLocalEvaluationRequest(request: Request): boolean {
-  return (
-    process.env.NODE_ENV !== "production" &&
-    isLoopbackHost(new URL(request.url).host) &&
-    (request.headers.get("host") === null || isLoopbackHost(request.headers.get("host")))
-  );
+  const host = request.headers.get("host");
+  return process.env.NODE_ENV !== "production" && (host === null || isLoopbackHost(host));
 }
