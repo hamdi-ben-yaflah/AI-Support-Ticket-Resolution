@@ -135,6 +135,24 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.1-pg17@sha256:3e8b3adfd27b5707128f60956f62a793c3c9326ea8cfaf0eab7adccb5d700b21
+        env:
+          POSTGRES_DB: support_copilot_browser_test
+          POSTGRES_PASSWORD: support_copilot_browser
+          POSTGRES_USER: support_copilot_browser
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U support_copilot_browser -d support_copilot_browser_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://support_copilot_browser:support_copilot_browser@127.0.0.1:5432/support_copilot_browser_test
+      E2E_DATABASE_URL: postgresql://support_copilot_browser:support_copilot_browser@127.0.0.1:5432/support_copilot_browser_test
+      SESSION_COOKIE_SECRET: ci-only-session-secret-for-browser-tests-32-chars
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -155,11 +173,18 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
+      - name: Apply browser-test migrations
+        run: pnpm db:migrate
       - name: Run Playwright browser tests
         env:
           CI: true
           ENABLE_LIVE_EVALUATIONS: "false"
         run: pnpm test:e2e
+      - name: Run database-backed browser assertions
+        env:
+          CI: true
+          ENABLE_LIVE_EVALUATIONS: "false"
+        run: pnpm test:e2e:database
       - name: Upload Playwright report and test artifacts
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

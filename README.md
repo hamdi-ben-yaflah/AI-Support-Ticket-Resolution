@@ -140,6 +140,32 @@ pnpm eval -- --concurrency=3 --output=artifacts/eval-results.json
 
 Unit tests are network-free. Live provider workflows are explicit and cost-bearing; they are not part of pull-request verification.
 
+### Browser journey verification
+
+The regular Playwright suite includes deterministic P0–P2 journeys. Run the P2 journeys directly with:
+
+```bash
+pnpm test:e2e:p2
+```
+
+Database-backed browser assertions use a separate PostgreSQL database whose name must end in `_test`; they refuse to run without `E2E_DATABASE_URL` and never fall back to `DATABASE_URL`:
+
+```bash
+E2E_DATABASE_URL=postgres://.../supporting_ticket_test pnpm test:e2e:database
+```
+
+`compose.yaml` starts both the development database on port `5432` and the disposable test database on port `5433`. Copy `.env.example` to `.env.local`, run `docker compose up -d`, and the database-backed browser config will load `E2E_DATABASE_URL` from `.env.local`.
+
+The live-provider smoke test is excluded from the regular Playwright and verification suites. It runs one synthetic ticket only and requires an explicit positive budget guard:
+
+```bash
+LIVE_PROVIDER_SMOKE=true LIVE_PROVIDER_SMOKE_BUDGET_USD=1 pnpm test:e2e:live
+```
+
+This makes one real provider request, may incur provider charges, and leaves only ordinary Playwright artifacts for cleanup.
+
+GitHub Actions keeps this smoke test in a separate manual workflow using the protected `ai-evaluation` environment. Set the environment variable `LIVE_PROVIDER_SMOKE_BUDGET_USD` to the approved positive budget and keep provider credentials in environment secrets; it is never part of pull-request CI or production deployment.
+
 ## Operations and deployment
 
 - [First production deploy](docs/operations/first-production-deploy.md)

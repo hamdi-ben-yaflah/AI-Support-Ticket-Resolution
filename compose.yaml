@@ -15,5 +15,22 @@ services:
       timeout: 5s
       retries: 10
 
+  postgres-test:
+    image: pgvector/pgvector:0.8.6-pg17@sha256:cf134a767f474095eeba57e0117be8e568e011a63f33fbf252f14c9b760f8e6f
+    environment:
+      POSTGRES_DB: support_copilot_test
+      POSTGRES_USER: support_copilot_test
+      POSTGRES_PASSWORD: support_copilot_test_local
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - support-copilot-postgres-test:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U support_copilot_test -d support_copilot_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   support-copilot-postgres:
+  support-copilot-postgres-test:
