@@ -9,6 +9,7 @@ const sdk = new NodeSDK({
       onStart() {},
       onEnd(span) {
         exported.push(span.attributes);
+        for (const event of span.events) exported.push(event.attributes);
       },
       forceFlush: async () => {},
       shutdown: async () => {},
@@ -52,5 +53,23 @@ describe("runtime trace export boundary", () => {
     expect(exported[0]).not.toHaveProperty("support.duration_ms");
     expect(exported[0]).not.toHaveProperty("support.retrieval.similarities");
     expect(exported[0]).not.toHaveProperty("support.operation");
+  });
+
+  it("filters retry event attributes through the same allowlist as span attributes", async () => {
+    await tracing.withSpan("support.ai.resolution", { root: true }, async (span) => {
+      span.addRetryEvent({
+        attempt: 2,
+        retryCount: 1,
+        delayMs: 187.5,
+        errorCode: "unavailable",
+      });
+    });
+    const event = exported.at(-1) as Record<string, unknown>;
+    expect(event).toEqual({
+      "support.attempt": 2,
+      "support.retry_count": 1,
+      "support.retry_delay_ms": 188,
+      "error.type": "unavailable",
+    });
   });
 });

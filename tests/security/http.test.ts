@@ -4,6 +4,7 @@ import {
   assertRequestOrigin,
   isLoopbackHost,
   readGuardedJson,
+  RequestGuardError,
   requestGuardResponse,
 } from "@/security/http";
 
@@ -84,6 +85,26 @@ describe("bounded JSON request boundary", () => {
       }
     }
   });
+  it.each([
+    [408, "request_timeout", true],
+    [413, "invalid_request", false],
+    [415, "invalid_request", false],
+    [403, "invalid_request", false],
+  ] as const)(
+    "maps guard status %i to a retryability-accurate code",
+    async (status, code, retryable) => {
+      const response = requestGuardResponse(
+        new RequestGuardError(status, "Guard rejected."),
+        traceId,
+      );
+      expect(response.status).toBe(status);
+      await expect(response.json()).resolves.toMatchObject({
+        ok: false,
+        traceId,
+        error: { code, retryable },
+      });
+    },
+  );
 });
 
 describe("origin and local-host boundaries", () => {

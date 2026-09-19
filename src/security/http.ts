@@ -27,17 +27,23 @@ export class RequestGuardError extends Error {
 export function requestGuardResponse(error: unknown, traceId: string): Response {
   const configuration = error instanceof SecurityConfigurationError;
   const known = error instanceof RequestGuardError;
+  // A 408 is a stalled connection, not a malformed request: the caller may safely retry it.
+  const timedOut = known && error.status === 408;
   const body: ApiResult<never> = {
     ok: false,
     traceId,
     error: {
-      code: configuration ? "configuration_error" : "invalid_request",
+      code: configuration
+        ? "configuration_error"
+        : timedOut
+          ? "request_timeout"
+          : "invalid_request",
       message: configuration
         ? "The request security service is not configured."
         : known
           ? error.message
           : "Request body must be valid JSON.",
-      retryable: false,
+      retryable: timedOut,
     },
   };
   return Response.json(body, {

@@ -30,6 +30,7 @@ export type NormalizedTraceErrorCode =
   | "invalid_json"
   | "invalid_output"
   | "persistence_error"
+  | "rate_limited"
   | "refused"
   | "retrieval_insufficient_evidence"
   | "retrieval_unavailable"
@@ -61,6 +62,7 @@ export type SafeTraceAttributes = {
   "support.finish_reason"?: string;
   "support.attempt"?: number;
   "support.retry_count"?: number;
+  "support.retry_delay_ms"?: number;
   "support.duration_ms"?: number;
   "support.provider_attempt_duration_ms"?: number;
   "support.validation.passed"?: boolean;
@@ -137,6 +139,7 @@ const SAFE_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
   "support.finish_reason",
   "support.attempt",
   "support.retry_count",
+  "support.retry_delay_ms",
   "support.duration_ms",
   "support.provider_attempt_duration_ms",
   "support.validation.passed",
@@ -210,12 +213,15 @@ function wrapSpan(span: Span, onFail?: () => void): ActiveTraceSpan {
       span.setAttributes(definedAttributes(attributes));
     },
     addRetryEvent(event) {
-      span.addEvent("support.retry", {
-        "support.attempt": event.attempt,
-        "support.retry_count": event.retryCount,
-        "support.retry_delay_ms": Math.max(0, Math.round(event.delayMs)),
-        "error.type": event.errorCode,
-      });
+      span.addEvent(
+        "support.retry",
+        definedAttributes({
+          "support.attempt": event.attempt,
+          "support.retry_count": event.retryCount,
+          "support.retry_delay_ms": Math.max(0, Math.round(event.delayMs)),
+          "error.type": event.errorCode,
+        }),
+      );
     },
     fail(code) {
       onFail?.();

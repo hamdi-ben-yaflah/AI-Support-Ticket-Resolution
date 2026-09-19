@@ -268,8 +268,11 @@ export function createResolveHandler(dependencies: HandlerDependencies = {}) {
           if (!permit.allowed) {
             rootSpan.setAttributes({
               "support.api.result_code": "rate_limited",
+              "support.retryable": true,
               "support.outcome": "rejected",
+              "support.duration_ms": Math.max(0, Date.now() - startedAt),
             });
+            rootSpan.fail("rate_limited");
             const response = failure(traceId, {
               status: 429,
               code: "rate_limited",
