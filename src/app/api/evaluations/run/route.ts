@@ -13,6 +13,7 @@ import { isEvaluationSetupError } from "@/evals/errors";
 import { runConfiguredEvaluation } from "@/evals/service";
 import { logger, type AppLogger } from "@/observability/logger";
 import {
+  isLocalEvaluationRequest,
   readGuardedJson,
   requestGuardResponse,
   SMALL_BODY_BYTES,
@@ -64,7 +65,7 @@ export function createEvaluationRunHandler(dependencies: HandlerDependencies = {
   let active = false;
 
   return async function POST(request: Request): Promise<Response> {
-    if (!isEnabled()) return disabledResponse();
+    if (!isLocalEvaluationRequest(request) || !isEnabled()) return disabledResponse();
 
     const traceId = createTraceId();
     let body: unknown;
