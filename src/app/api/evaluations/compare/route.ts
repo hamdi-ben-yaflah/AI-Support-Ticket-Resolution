@@ -13,7 +13,6 @@ import {
 } from "@/evals/comparison-contracts";
 import { compareEvaluationRuns, EvaluationComparisonError } from "@/evals/comparison";
 import { logger, type AppLogger } from "@/observability/logger";
-import { isLocalEvaluationRequest } from "@/security/http";
 
 const ResultSchema = createApiResultSchema(EvaluationComparisonSchema);
 
@@ -78,7 +77,7 @@ export function createEvaluationCompareHandler(dependencies: Dependencies = {}) 
   const log = dependencies.log ?? logger;
 
   return async function GET(request: Request): Promise<Response> {
-    if (!isLocalEvaluationRequest(request) || !isEnabled()) return disabledResponse();
+    if (!isEnabled()) return disabledResponse();
 
     const traceId = createTraceId();
     const input = parseRequest(request);

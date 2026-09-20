@@ -1,15 +1,13 @@
-import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { EvaluationConsole } from "@/app/admin/evaluations/evaluation-console";
 import { isLiveEvaluationEnabled } from "@/config/deployment";
-import { isLoopbackHost } from "@/security/http";
 
 export const dynamic = "force-dynamic";
 
-export default async function EvaluationsPage() {
-  if (!isLiveEvaluationEnabled() || !isLoopbackHost((await headers()).get("host"))) notFound();
+export default function EvaluationsPage() {
+  if (!isLiveEvaluationEnabled()) notFound();
 
   return (
     <main className="min-h-screen bg-[#f4f3ee] px-4 py-5 text-[#17201d] sm:px-7 sm:py-8 lg:px-10">

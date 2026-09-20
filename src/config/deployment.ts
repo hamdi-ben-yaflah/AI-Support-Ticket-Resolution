@@ -33,7 +33,9 @@ export function getDeploymentConfig(
     appVersion: parsed.data.APP_VERSION,
     databaseReadinessTimeoutMs: parsed.data.DATABASE_READINESS_TIMEOUT_MS,
     liveEvaluationsEnabled:
-      parsed.data.NODE_ENV !== "production" && parsed.data.ENABLE_LIVE_EVALUATIONS !== "false",
+      parsed.data.ENABLE_LIVE_EVALUATIONS === undefined
+        ? parsed.data.NODE_ENV !== "production"
+        : parsed.data.ENABLE_LIVE_EVALUATIONS === "true",
   };
 }
 
