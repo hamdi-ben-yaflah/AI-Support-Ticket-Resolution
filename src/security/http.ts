@@ -143,9 +143,10 @@ export function isLoopbackHost(host: string | null): boolean {
   return LoopbackAuthoritySchema.safeParse(host).success;
 }
 
-// Only the Host header records the authority the client addressed; the request URL carries a
-// synthetic `localhost` in dev whatever interface it arrived on, so testing it proves nothing.
 export function isLocalEvaluationRequest(request: Request): boolean {
-  const host = request.headers.get("host");
-  return process.env.NODE_ENV !== "production" && (host === null || isLoopbackHost(host));
+  return (
+    process.env.NODE_ENV !== "production" &&
+    isLoopbackHost(new URL(request.url).host) &&
+    (request.headers.get("host") === null || isLoopbackHost(request.headers.get("host")))
+  );
 }

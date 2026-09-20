@@ -7,7 +7,6 @@ import { EvaluationRepositoryError, listRecentEvaluationRuns } from "@/db/evalua
 import { createApiResultSchema, type ApiErrorCode, type ApiResult } from "@/domain/api-result";
 import { EvaluationRunListSchema, type EvaluationRunSummary } from "@/evals/comparison-contracts";
 import { logger, type AppLogger } from "@/observability/logger";
-import { isLocalEvaluationRequest } from "@/security/http";
 
 const ResultSchema = createApiResultSchema(EvaluationRunListSchema);
 
@@ -64,7 +63,7 @@ export function createEvaluationRunsHandler(dependencies: Dependencies = {}) {
   const log = dependencies.log ?? logger;
 
   return async function GET(request: Request): Promise<Response> {
-    if (!isLocalEvaluationRequest(request) || !isEnabled()) return disabledResponse();
+    if (!isEnabled()) return disabledResponse();
 
     const traceId = createTraceId();
     const limit = parseLimit(request);
