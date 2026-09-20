@@ -111,7 +111,7 @@ pnpm eval -- --concurrency=3 --output=artifacts/eval-results.json
 
 The evaluator uses the same classification, retrieval, and resolution pipeline as the application. It records safe aggregate and per-case results, preserves dataset order, and gates on schema validity, category accuracy, retrieval recall, citation support, and abstention accuracy. It never stores ticket text, full prompts, drafts, provider payloads, vectors, or secrets.
 
-For a local browser console, run `pnpm dev` with `ENABLE_LIVE_EVALUATIONS=true` and open [`/admin/evaluations`](http://localhost:3000/admin/evaluations). This is intentionally disabled in production and is not a production analytics dashboard.
+For a local browser console, run `pnpm dev --hostname 127.0.0.1` with `ENABLE_LIVE_EVALUATIONS=true` and open [`/admin/evaluations`](http://localhost:3000/admin/evaluations). This is intentionally disabled in production and is not a production analytics dashboard.
 
 ## Trust and safety boundaries
 
@@ -168,6 +168,7 @@ GitHub Actions keeps this smoke test in a separate manual workflow using the pro
 
 ## Operations and deployment
 
+- [AI security controls and verification](docs/operations/ai-security.md)
 - [First production deploy](docs/operations/first-production-deploy.md)
 - [Dokploy deployment and rollback procedures](docs/operations/dokploy-deployment.md)
 - [Langfuse observability guide](docs/operations/langfuse-observability.md)
