@@ -28,6 +28,7 @@ export type NormalizedTraceErrorCode =
   | "invalid_json"
   | "invalid_output"
   | "persistence_error"
+  | "rate_limited"
   | "refused"
   | "retrieval_insufficient_evidence"
   | "retrieval_unavailable"
