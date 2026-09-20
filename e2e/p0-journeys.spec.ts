@@ -26,27 +26,18 @@ async function submitTicket(page: Page, tier: "standard" | "premium" = "standard
 test("resolve-ticket-displays-grounded-draft-and-citations", async ({ page }) => {
   const fixtures = createApiFixtureHarness();
   const resolutionRequests: unknown[] = [];
-  let finishResolution!: () => void;
-  const resolutionReleased = new Promise<void>((resolve) => {
-    finishResolution = resolve;
-  });
 
   await page.route("**/api/tickets/resolve", async (route) => {
     resolutionRequests.push(JSON.parse(route.request().postData() ?? "null"));
-    await resolutionReleased;
-    await fulfillAfter(route, fixtures.fixtures.resolution.reply, 0);
+    await fulfillAfter(route, fixtures.fixtures.resolution.reply);
   });
   await fixtures.routeSource(page, fixtures.fixtures.source.reply, FIXTURE_IDS.replyChunk);
 
   await page.goto("/");
   await expect(page.getByText("Awaiting a ticket")).toBeVisible();
   await submitTicket(page, "premium");
-  try {
-    await expect(page.getByRole("button", { name: "Resolving…" })).toBeDisabled();
-    await expect(page.getByText("Resolving the ticket…")).toBeVisible();
-  } finally {
-    finishResolution();
-  }
+  await expect(page.getByRole("button", { name: "Resolving…" })).toBeDisabled();
+  await expect(page.getByText("Resolving the ticket…")).toBeVisible();
 
   await expect(page.getByText("Supported draft ready")).toBeVisible();
   await expect(page.getByText("billing", { exact: true })).toBeVisible();
