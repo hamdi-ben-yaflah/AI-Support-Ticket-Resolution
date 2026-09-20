@@ -360,6 +360,7 @@ describe("TicketResolutionForm", () => {
   it.each([
     ["retrieval_unavailable", "temporarily unavailable", "Try resolution again"],
     ["model_output_invalid", "did not pass validation", undefined],
+    ["request_timeout", "did not arrive in time", "Try resolution again"],
   ] as const)("renders controlled %s details", async (code, message, retryLabel) => {
     const user = userEvent.setup();
     vi.stubGlobal(
