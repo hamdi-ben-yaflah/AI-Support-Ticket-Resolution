@@ -9,6 +9,7 @@ import {
 } from "@/ai/pipeline/resolve-ticket";
 import { getOrCreateResolutionSession, type ResolutionSession } from "@/auth/session";
 import { SessionConfigurationError } from "@/config/session";
+import { SecurityConfigurationError } from "@/config/security";
 import { persistSuccessfulResolution } from "@/db/resolution-runs";
 import { createApiResultSchema, type ApiErrorCode, type ApiResult } from "@/domain/api-result";
 import { ResolutionProposalSchema, type ResolutionProposal } from "@/domain/grounded-reply";
@@ -23,6 +24,12 @@ import {
   type NormalizedTraceErrorCode,
 } from "@/observability/tracing";
 import { isRetrievalError } from "@/retrieval/errors";
+import {
+  PRIVATE_NO_STORE,
+  readGuardedJson,
+  requestGuardResponse,
+  TICKET_BODY_BYTES,
+} from "@/security/http";
 
 type Resolver = (input: TicketInput, context: ResolutionContext) => Promise<ResolutionExecution>;
 
@@ -62,11 +69,14 @@ function failure(traceId: string, error: ErrorResponse) {
     },
   };
 
-  return NextResponse.json(ResolutionApiResultSchema.parse(body), { status: error.status });
+  return NextResponse.json(ResolutionApiResultSchema.parse(body), {
+    status: error.status,
+    headers: PRIVATE_NO_STORE,
+  });
 }
 
 function mapResolutionError(error: unknown): ErrorResponse {
-  if (error instanceof SessionConfigurationError) {
+  if (error instanceof SessionConfigurationError || error instanceof SecurityConfigurationError) {
     return {
       status: 500,
       code: "configuration_error",
@@ -196,31 +206,29 @@ export function createResolveHandler(dependencies: HandlerDependencies = {}) {
         let body: unknown;
 
         try {
-          body = await request.json();
-        } catch {
+          body = await readGuardedJson(request, TICKET_BODY_BYTES);
+        } catch (error) {
+          const response = requestGuardResponse(error, traceId);
+          const configuration = response.status === 500;
           rootSpan.setAttributes({
-            "support.api.result_code": "invalid_request",
+            "support.api.result_code": configuration ? "configuration_error" : "invalid_request",
             "support.retryable": false,
             "support.outcome": "rejected",
             "support.duration_ms": Math.max(0, Date.now() - startedAt),
           });
-          rootSpan.fail("invalid_json");
+          rootSpan.fail(configuration ? "configuration" : "invalid_input");
           log.warn(
             withTraceCorrelation(
               {
                 event: "resolve_request_rejected",
                 traceId,
-                reason: "malformed_json",
+                reason: "request_security",
+                status: response.status,
               },
               appTracing,
             ),
           );
-          return failure(traceId, {
-            status: 400,
-            code: "invalid_request",
-            message: "Request body must be valid JSON.",
-            retryable: false,
-          });
+          return response;
         }
 
         const input = TicketInputSchema.safeParse(body);
@@ -323,6 +331,7 @@ export function createResolveHandler(dependencies: HandlerDependencies = {}) {
           );
           const response = NextResponse.json(ResolutionApiResultSchema.parse(result), {
             status: 200,
+            headers: PRIVATE_NO_STORE,
           });
           if (session.cookie) {
             response.cookies.set(session.cookie.name, session.cookie.value, session.cookie.options);
