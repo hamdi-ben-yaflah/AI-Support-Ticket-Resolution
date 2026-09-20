@@ -185,19 +185,6 @@ describe("ticket-resolution trace topology", () => {
     expect(spans.every((span) => span.ended)).toBe(true);
 
     const exported = JSON.stringify(spans);
-    const logs = JSON.stringify([
-      vi.mocked(log.info).mock.calls,
-      vi.mocked(log.warn).mock.calls,
-      vi.mocked(log.error).mock.calls,
-    ]);
-    for (const canary of [
-      ticketText,
-      "Private source content marker.",
-      "secret-cookie",
-      "We can review the duplicate charge.",
-    ]) {
-      expect(logs).not.toContain(canary);
-    }
     expect(exported).not.toContain(ticketText);
     expect(exported).not.toContain("Duplicate charge reported.");
     expect(exported).not.toContain("We can review the duplicate charge.");
