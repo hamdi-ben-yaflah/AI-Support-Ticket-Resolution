@@ -43,6 +43,7 @@ type RefundActionState =
 
 const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   invalid_request: "The ticket input was rejected. Check its length and customer tier.",
+  rate_limited: "Too many resolution requests are in flight. Wait a moment and try again.",
   request_timeout: "The request did not arrive in time. Check your connection and try again.",
   provider_timeout: "The model took too long to respond. You can try this ticket again.",
   provider_unavailable: "The model service is temporarily unavailable. You can try again.",

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const ApiErrorCodeSchema = z.enum([
   "invalid_request",
+  "rate_limited",
   "request_timeout",
   "provider_timeout",
   "provider_unavailable",
