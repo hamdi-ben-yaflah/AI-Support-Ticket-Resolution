@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-cancel-subscription",
+  "task": "evaluation",
+  "requestHash": "9ea6f12be12f147a50273d13b3f9019aa18caf7c4f742698c348790d9d7a4472",
+  "response": {
+    "value": {
+      "decisions": [
+        {
+          "citationId": "5ba4a8be-ad24-5439-85ee-632cda80cde0",
+          "supported": true,
+          "rationale": "The evidence directly states cancellation stops next renewal, access continues through displayed end date, and cancellation alone does not create/approve a refund, matching the claim exactly."
+        }
+      ]
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

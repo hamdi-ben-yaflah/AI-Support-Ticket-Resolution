@@ -129,6 +129,61 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  evaluate-replay:
+    name: Offline evaluation regression gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.1-pg17@sha256:3e8b3adfd27b5707128f60956f62a793c3c9326ea8cfaf0eab7adccb5d700b21
+        env:
+          POSTGRES_DB: support_copilot_replay_test
+          POSTGRES_PASSWORD: support_copilot_replay
+          POSTGRES_USER: support_copilot_replay
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U support_copilot_replay -d support_copilot_replay_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://support_copilot_replay:support_copilot_replay@127.0.0.1:5432/support_copilot_replay_test
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Apply committed migrations
+        run: pnpm db:migrate
+      - name: Ingest synthetic knowledge base from replay cassettes
+        run: pnpm ingest:replay
+      - name: Run offline evaluation regression gate
+        run: pnpm eval:replay -- --concurrency=3 --output=artifacts/eval-replay-results.json
+      - name: Upload replay evaluation report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: evaluation-replay-${{ github.sha }}
+          path: artifacts/eval-replay-results.json
+          if-no-files-found: warn
+          retention-days: 14
+
   browser:
     name: Playwright browser tests
     runs-on: ubuntu-latest
@@ -218,7 +273,7 @@ jobs:
 
   container:
     name: Verify production container
-    needs: [quality, integration]
+    needs: [quality, integration, evaluate-replay]
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:

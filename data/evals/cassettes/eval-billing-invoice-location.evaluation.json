@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-invoice-location",
+  "task": "evaluation",
+  "requestHash": "9d27850aa479a9ca426ac42f67795d4c7265a133e24bcf31fe209d60f23954dc",
+  "response": {
+    "value": {
+      "decisions": [
+        {
+          "citationId": "fe58e489-7d74-54b1-9df3-07068e9e7ed8",
+          "supported": true,
+          "rationale": "Evidence directly states invoices are in Billing under Payment history, available after completed payments, and pending payments lack a final invoice, matching the claim exactly."
+        }
+      ]
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-account-verification-boundary",
+  "task": "evaluation",
+  "requestHash": "c1f15ccce1ad70dae442cc1dcc1f4aa0b26af1f755e8d36008188265cd7fc2bb",
+  "response": {
+    "value": {
+      "decisions": [
+        {
+          "citationId": "f914f07a-2348-569a-9d65-844e18f64fb1",
+          "supported": false,
+          "rationale": "Evidence lists password, one-time code, recovery code, full card number, and card security code as prohibited, but never mentions 'private key' which the claim includes."
+        },
+        {
+          "citationId": "2cef9c96-11a0-5f28-8950-d9a0316323ce",
+          "supported": true,
+          "rationale": "Evidence explicitly states support must not request a password, recovery code, or full payment-card number, matching the claim exactly."
+        }
+      ]
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

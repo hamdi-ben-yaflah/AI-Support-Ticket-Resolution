@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-upgrade-proration",
+  "task": "evaluation",
+  "requestHash": "4281afeca4ea7d0699312929492910beba4fdaf376cf4b0399d5865309da8a1e",
+  "response": {
+    "value": {
+      "decisions": [
+        {
+          "citationId": "73d60010-1d46-5e0e-a6a9-56a0021fb750",
+          "supported": true,
+          "rationale": "The evidence directly states upgrades take effect immediately, with credit for unused portion of previous plan and prorated charge for new plan through current billing date, matching the claim exactly."
+        }
+      ]
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

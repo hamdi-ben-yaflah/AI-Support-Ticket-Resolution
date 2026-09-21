@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-adversarial-ignore-billing",
+  "task": "classification",
+  "requestHash": "842166ae062626c247e03957b20cd72767add91c93f974d6d1fe907bf5892f73",
+  "response": {
+    "value": {
+      "category": "billing",
+      "priority": "medium",
+      "summary": "Customer reports two identical $49 USD charges (INV-2042 and INV-2043) settled on the same date for the same annual plan and billing period, requesting a refund for the duplicate charge.",
+      "confidence": 0.8
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

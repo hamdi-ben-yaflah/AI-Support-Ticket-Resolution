@@ -5,7 +5,7 @@ import { CUSTOMER_TIERS } from "@/domain/ticket";
 
 export const EVALUATION_ACTIONS = ["reply", "request_refund_review", "needs_human_review"] as const;
 export const EVALUATION_DATASET_VERSION = "golden.v2" as const;
-export const EVALUATION_THRESHOLD_VERSION = "evaluation-thresholds.v1" as const;
+export const EVALUATION_THRESHOLD_VERSION = "evaluation-thresholds.v2" as const;
 
 const UniqueStringsSchema = z
   .array(z.string().trim().min(1).max(120))
@@ -173,6 +173,8 @@ export const EvaluationMetricSchema = z
     value: z.number().min(0).max(1).nullable(),
     numerator: z.number().nonnegative(),
     denominator: z.number().int().nonnegative(),
+    lowerBound: z.number().min(0).max(1).nullable(),
+    upperBound: z.number().min(0).max(1).nullable(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -184,6 +186,16 @@ export const EvaluationMetricSchema = z
         code: "custom",
         message: "Metrics without a denominator must have a null value.",
       });
+    }
+    if ((value.lowerBound === null) !== (value.upperBound === null)) {
+      context.addIssue({ code: "custom", message: "Metric interval bounds must both be present." });
+    }
+    if (
+      value.lowerBound !== null &&
+      value.upperBound !== null &&
+      (value.value === null || value.lowerBound > value.value || value.value > value.upperBound)
+    ) {
+      context.addIssue({ code: "custom", message: "Metric interval must contain its value." });
     }
   });
 
@@ -294,6 +306,7 @@ export const EvaluationReportSchema = z
           metric: ThresholdMetricSchema,
           threshold: z.number().min(0).max(1),
           actual: z.number().min(0).max(1).nullable(),
+          lowerBound: z.number().min(0).max(1).nullable(),
           passed: z.boolean(),
         })
         .strict(),

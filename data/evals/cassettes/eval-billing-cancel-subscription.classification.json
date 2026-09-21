@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-cancel-subscription",
+  "task": "classification",
+  "requestHash": "af4adeb2c230156fed2b7757b74f7875b3096bbb67d92bc0e3028e002201e07d",
+  "response": {
+    "value": {
+      "category": "billing",
+      "priority": "low",
+      "summary": "Customer canceled their subscription and is asking how long they will retain access.",
+      "confidence": 0.8
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

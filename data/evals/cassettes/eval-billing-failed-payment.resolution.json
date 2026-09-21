@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-failed-payment",
+  "task": "resolution",
+  "requestHash": "ec53d7a03ded49e125032f9f0a1c890fb019dd5c6decff4822e57aaeee7fa490",
+  "response": {
+    "value": {
+      "action": "reply",
+      "reason": "Knowledge chunk directly addresses failed payment troubleshooting steps, so a customer-facing reply can be drafted without needing a refund review.",
+      "groundedReply": {
+        "suggestedResponse": "Thanks for letting us know about the failed renewal payment. Before retrying, please check the following: 1) Card expiry date is current and correct, 2) Billing address on file matches your card issuer's records, 3) Sufficient available funds/credit limit on the card. Once you've confirmed or corrected these details, you can retry the payment once. If the payment continues to fail after correcting these details, we'd recommend contacting your card issuer directly, as repeated retries can trigger their fraud/security controls. Let us know if you need further assistance!",
+        "citations": [
+          {
+            "chunkId": "7fdcda0f-918c-5074-81ac-4889da435bdb",
+            "sourceId": "invoices-and-payments",
+            "section": "Invoices and payments > Failed payments",
+            "claim": "Customer should verify card expiry date, billing address, and available funds before retrying a failed payment, and contact the card issuer if repeated retries fail."
+          }
+        ]
+      }
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

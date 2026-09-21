@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-cancel-subscription",
+  "task": "resolution",
+  "requestHash": "d4eaeece243418c296be56caef74af521b65cdc2d9ef1504ac8ef82467c68b22",
+  "response": {
+    "value": {
+      "action": "reply",
+      "reason": "Knowledge chunk directly answers the question about access duration after cancellation.",
+      "groundedReply": {
+        "suggestedResponse": "Thanks for reaching out. When you cancel your subscription, this stops the next renewal, but it does not remove access you've already paid for. You'll continue to have access through the end date shown on your account for the current billing period. Cancellation alone does not trigger a refund. If you'd like to confirm the exact end date on your account, please let us know and we can look into it further.",
+        "citations": [
+          {
+            "chunkId": "5ba4a8be-ad24-5439-85ee-632cda80cde0",
+            "sourceId": "subscription-changes",
+            "section": "Subscription changes > Cancellation",
+            "claim": "Cancellation stops the next renewal but access continues through the displayed end date of the current paid period, and cancellation alone does not create a refund."
+          }
+        ]
+      }
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

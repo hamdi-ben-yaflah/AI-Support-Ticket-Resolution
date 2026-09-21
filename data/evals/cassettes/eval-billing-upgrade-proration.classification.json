@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-upgrade-proration",
+  "task": "classification",
+  "requestHash": "c2fcb51db54a9759f85ee10af7bbcd4119c4d5119c18130da0068417d96adb01",
+  "response": {
+    "value": {
+      "category": "billing",
+      "priority": "low",
+      "summary": "Customer upgraded plan and requests clarification on prorated charge and credit applied.",
+      "confidence": 0.8
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

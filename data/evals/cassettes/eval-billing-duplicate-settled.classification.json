@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-duplicate-settled",
+  "task": "classification",
+  "requestHash": "7346c013cf0f81f5b6833d1ad8e70b64480f0728660491e03160db16b9c84420",
+  "response": {
+    "value": {
+      "category": "billing",
+      "priority": "medium",
+      "summary": "Customer requests refund review for duplicate $29 USD charges on invoices INV-1042 and INV-1043, same account and billing period, settled 2026-09-08.",
+      "confidence": 0.85
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

@@ -23,7 +23,11 @@ async function main(): Promise<void> {
     import("../src/evals/service"),
     import("../src/evals/format"),
   ]);
-  const report = await runConfiguredEvaluation(options.concurrency);
+  const rawMode = process.env.EVALUATION_MODE ?? "live";
+  if (rawMode !== "live" && rawMode !== "record" && rawMode !== "replay") {
+    throw new Error("Evaluation mode is invalid.");
+  }
+  const report = await runConfiguredEvaluation(options.concurrency, rawMode);
   await writeReportAtomically(options.output, report);
   process.stdout.write(formatEvaluationSummary(report));
   process.stdout.write(`Report: ${options.output}\n`);

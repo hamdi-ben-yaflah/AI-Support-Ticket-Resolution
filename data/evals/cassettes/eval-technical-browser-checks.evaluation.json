@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-technical-browser-checks",
+  "task": "evaluation",
+  "requestHash": "8b5d64f73d6a54b2c70f9e41be314b5e69da4972fc8b1de2d38b271785e3a662",
+  "response": {
+    "value": {
+      "decisions": [
+        {
+          "citationId": "ee4d007b-a93e-5125-8386-ec07c786068a",
+          "supported": true,
+          "rationale": "Evidence lists exact same diagnostic details and initial steps as claim describes."
+        }
+      ]
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

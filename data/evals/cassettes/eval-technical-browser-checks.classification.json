@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-technical-browser-checks",
+  "task": "classification",
+  "requestHash": "f58a5897afb10aa9b71e71833c93104ac51b829fb28c29ec756f14bc6beb73b2",
+  "response": {
+    "value": {
+      "category": "technical",
+      "priority": "low",
+      "summary": "Customer reports app fails in browser and asks what initial troubleshooting details are needed.",
+      "confidence": 0.6
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

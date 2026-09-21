@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-other-shipping",
+  "task": "classification",
+  "requestHash": "7988e744ec51a068717471d9f35f28560fcb51b2d0b995f03525220eeaa6c173",
+  "response": {
+    "value": {
+      "category": "other",
+      "priority": "low",
+      "summary": "Customer requests tracking assistance for a parcel from an unrelated online store, unrelated to our product or services.",
+      "confidence": 0.85
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "cassette-manifest.v1",
+  "llm": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5"
+  },
+  "embeddings": {
+    "provider": "voyage",
+    "model": "voyage-4",
+    "dimensions": 1024,
+    "batchSize": 64
+  },
+  "evaluation": {
+    "retrieval": {
+      "version": "retrieval.v1",
+      "candidateCount": 8,
+      "finalCount": 5,
+      "minimumSimilarity": 0.55,
+      "maximumContextTokens": 3500,
+      "minimumEvidenceCount": 1
+    },
+    "resolutionPolicy": {
+      "version": "resolution-policy.v1",
+      "minimumConfidence": 0.55
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-refund-window",
+  "task": "resolution",
+  "requestHash": "f0ef1422de75ac5a86b5ab4ab33cc58a3f3065374405f7e0888eb8bf51cd6d04",
+  "response": {
+    "value": {
+      "action": "reply",
+      "reason": "The ticket lacks required details (invoice identifier, exact charge date, amount, reason, subscription status) needed to evaluate a refund review request. The policy confirms a 14-day review window exists, so a reply asking for these specifics is a safe next step.",
+      "groundedReply": {
+        "suggestedResponse": "Thank you for reaching out. I'd like to help you request a refund review. Since charges can be reviewed within 14 days of the transaction, could you please provide the following details: 1) the invoice or transaction ID for the charge, 2) the exact date of the charge, 3) the amount charged, 4) the reason you're requesting a refund, and 5) your current subscription status (active, canceled, etc.)? Once I have this information, I can submit it for review. Please note that a review does not guarantee approval.",
+        "citations": [
+          {
+            "chunkId": "9549dc2f-00e8-574d-b368-236439a5ca73",
+            "sourceId": "refund-policy",
+            "section": "Refund review policy > Eligibility review",
+            "claim": "Refunds are not automatic; customers may request review within 14 days of the charge, and support must not guarantee approval."
+          }
+        ]
+      }
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

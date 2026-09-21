@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-account-email-unavailable",
+  "task": "resolution",
+  "requestHash": "d5b4f4ed09512499d091ae3d73b3f2a8a94526f626e4c9f8adef1053cb1e9608",
+  "response": {
+    "value": {
+      "action": "reply",
+      "reason": "Knowledge clearly specifies the required next step for lost email access: route to identity verification without changing the sign-in email or requesting sensitive credentials.",
+      "groundedReply": {
+        "suggestedResponse": "I'm sorry for the trouble accessing your account. Since you no longer have access to the email on file, we can't reset your password through the normal email link. This situation needs to go through our identity verification process before any change can be made to your account's contact email. I'll route your case for identity verification now. Please note we will never ask you for your password, a recovery code, or your full payment card number during this process — if anyone asks for those, please disregard it. Once verification is complete, we can help restore access to your account.",
+        "citations": [
+          {
+            "chunkId": "2cef9c96-11a0-5f28-8950-d9a0316323ce",
+            "sourceId": "account-access",
+            "section": "Account access recovery > No access to the email address",
+            "claim": "When a customer lacks access to their account email, the case must be routed to identity verification rather than changing the email based on the ticket alone, and support must not request a password, recovery code, or card number."
+          }
+        ]
+      }
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

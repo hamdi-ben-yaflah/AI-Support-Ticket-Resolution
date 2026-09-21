@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-pending-invoice",
+  "task": "resolution",
+  "requestHash": "3891a8ddf3bb496f536f3deac553d76871d9ff15e0c97070991877ef6c671fd7",
+  "response": {
+    "value": {
+      "action": "reply",
+      "reason": "Knowledge explains that invoices are only generated once a payment completes, so this can be answered directly without needing a refund review or further escalation.",
+      "groundedReply": {
+        "suggestedResponse": "Thank you for reaching out. Invoices become available in Billing under Payment history only once a payment reaches a completed state. Since your payment is currently showing as pending, a final invoice isn't generated yet. Once the payment completes, the invoice should appear there. If it remains pending for an extended time or doesn't complete, please let us know and we can look into it further.",
+        "citations": [
+          {
+            "chunkId": "fe58e489-7d74-54b1-9df3-07068e9e7ed8",
+            "sourceId": "invoices-and-payments",
+            "section": "Invoices and payments > Finding an invoice",
+            "claim": "An invoice is available only after a payment reaches a completed state; pending payments do not yet have a final invoice."
+          }
+        ]
+      }
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

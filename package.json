@@ -22,8 +22,12 @@
     "db:check": "node scripts/check-migrations.mjs",
     "db:migrate": "drizzle-kit migrate",
     "ingest": "NODE_OPTIONS=--conditions=react-server tsx scripts/ingest.ts",
+    "ingest:replay": "INGESTION_MODE=replay NODE_OPTIONS=--conditions=react-server tsx scripts/ingest.ts",
+    "ingest:record": "INGESTION_MODE=record NODE_OPTIONS=--conditions=react-server tsx scripts/ingest.ts",
     "chunks:inspect": "NODE_OPTIONS=--conditions=react-server tsx scripts/inspect-chunks.ts",
     "eval": "NODE_OPTIONS=--conditions=react-server tsx scripts/eval.ts",
+    "eval:replay": "EVALUATION_MODE=replay NODE_OPTIONS=--conditions=react-server tsx scripts/eval.ts",
+    "eval:record": "EVALUATION_MODE=record NODE_OPTIONS=--conditions=react-server tsx scripts/eval.ts",
     "test:integration": "vitest run --config vitest.integration.config.mts --reporter=default --reporter=junit --outputFile=artifacts/integration-tests.xml",
     "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm db:check && pnpm test:coverage && pnpm build:operations && pnpm build"
   },

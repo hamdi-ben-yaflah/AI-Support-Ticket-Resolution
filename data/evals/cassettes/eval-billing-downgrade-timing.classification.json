@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-downgrade-timing",
+  "task": "classification",
+  "requestHash": "921c9763d120806fbc3b9f4d32a83ccc07086841045a6306b54c679725a343bb",
+  "response": {
+    "value": {
+      "category": "billing",
+      "priority": "low",
+      "summary": "Customer asks when a subscription downgrade will take effect and whether current features remain until then.",
+      "confidence": 0.7
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

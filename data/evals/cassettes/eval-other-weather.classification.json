@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-other-weather",
+  "task": "classification",
+  "requestHash": "12b3474a65d9f137096d889b09a706ccda6a8b9fa117ab29059222b8a7fc2151",
+  "response": {
+    "value": {
+      "category": "other",
+      "priority": "low",
+      "summary": "Customer asked about the weather forecast for Berlin next weekend, unrelated to product or account support.",
+      "confidence": 0.9
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

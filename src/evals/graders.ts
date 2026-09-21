@@ -9,6 +9,7 @@ import type {
 import type { ResolutionExecution } from "@/domain/resolution-run";
 import type { RetrievedEvidence } from "@/retrieval/types";
 import type { z } from "zod";
+import { wilsonScoreInterval } from "@/evals/statistics";
 
 export type CaseScores = z.infer<typeof EvaluationCaseScoresSchema>;
 
@@ -64,7 +65,14 @@ export function failedExecutionScores(goldenCase: GoldenCase): CaseScores {
 
 function booleanMetric(values: readonly boolean[]): EvaluationMetric {
   const numerator = values.filter(Boolean).length;
-  return { numerator, denominator: values.length, value: ratio(numerator, values.length) };
+  const interval = wilsonScoreInterval(numerator, values.length);
+  return {
+    numerator,
+    denominator: values.length,
+    value: ratio(numerator, values.length),
+    lowerBound: interval?.lowerBound ?? null,
+    upperBound: interval?.upperBound ?? null,
+  };
 }
 
 function optionalAverage(values: readonly (number | null)[]): EvaluationMetric {
@@ -74,6 +82,8 @@ function optionalAverage(values: readonly (number | null)[]): EvaluationMetric {
     numerator,
     denominator: scored.length,
     value: ratio(numerator, scored.length),
+    lowerBound: null,
+    upperBound: null,
   };
 }
 
@@ -91,6 +101,8 @@ function abstentionMetric(
     numerator,
     denominator: population.length,
     value: ratio(numerator, population.length),
+    lowerBound: wilsonScoreInterval(numerator, population.length)?.lowerBound ?? null,
+    upperBound: wilsonScoreInterval(numerator, population.length)?.upperBound ?? null,
   };
 }
 

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-account-suspicious-signin",
+  "task": "evaluation",
+  "requestHash": "ceb81b113ea063addba2b168f1006adbee5a28f22f7dcdb6f71000fe4de23038",
+  "response": {
+    "value": {
+      "decisions": [
+        {
+          "citationId": "2b990f84-b20a-504e-b68d-0fcd00530f44",
+          "supported": true,
+          "rationale": "Evidence directly states unexpected sign-ins are high priority, advises resetting password from trusted device, revoking unfamiliar sessions, and escalating if unable to sign in, matching the claim exactly."
+        }
+      ]
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

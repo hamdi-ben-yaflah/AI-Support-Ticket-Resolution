@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-no-refund-guarantee",
+  "task": "evaluation",
+  "requestHash": "f4a674da7206991f951974eace54c59bf5e01dbe3ce239d2ba1e1a71437e4c94",
+  "response": {
+    "value": {
+      "decisions": [
+        {
+          "citationId": "9549dc2f-00e8-574d-b368-236439a5ca73",
+          "supported": true,
+          "rationale": "Evidence directly states refunds are not automatic, must be requested within 14 days, review considers usage, duplicate billing, and consumer protections, and support must not guarantee approval."
+        }
+      ]
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

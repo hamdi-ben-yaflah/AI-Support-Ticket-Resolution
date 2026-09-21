@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-technical-multiple-users",
+  "task": "classification",
+  "requestHash": "326b3ec1d7935c9073b2bea279f3d4d5f1251121b82f49bd44db33ac35359e33",
+  "response": {
+    "value": {
+      "category": "technical",
+      "priority": "medium",
+      "summary": "Premium customer reports a core feature has stopped working for six users in the Berlin office.",
+      "confidence": 0.7
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-account-suspicious-signin",
+  "task": "resolution",
+  "requestHash": "b09cbfd5de68afc77d23bbcbb2cfeb7e37f39cadb807b86dacff297fc6375085",
+  "response": {
+    "value": {
+      "action": "reply",
+      "reason": "Knowledge chunk on suspected compromise provides a safe, actionable next step for unexpected sign-in alerts.",
+      "groundedReply": {
+        "suggestedResponse": "I'm sorry to hear about this unexpected sign-in alert. For your security, please take the following steps as soon as possible: 1) From a trusted device, reset your account password immediately. 2) Go to your account's Security settings and review your active sessions, then revoke any session you don't recognize. If you're unable to sign in to complete these steps, please let us know right away so we can escalate this for further assistance.",
+        "citations": [
+          {
+            "chunkId": "2b990f84-b20a-504e-b68d-0fcd00530f44",
+            "sourceId": "account-security",
+            "section": "Account security and verification > Suspected compromise",
+            "claim": "Unexpected sign-ins should be treated as high priority; advise resetting password from a trusted device and revoking unfamiliar sessions from Security settings, and escalate if the customer cannot sign in."
+          }
+        ]
+      }
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

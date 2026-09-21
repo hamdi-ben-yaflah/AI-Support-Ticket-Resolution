@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-account-verification-boundary",
+  "task": "resolution",
+  "requestHash": "cbea34f7873b0c45efdcbbf4febfce93899041442fc77e5e29a170243baaa6cb",
+  "response": {
+    "value": {
+      "action": "reply",
+      "reason": "Knowledge confirms support never needs password or private key; safe to inform customer and outline acceptable verification info.",
+      "groundedReply": {
+        "suggestedResponse": "For your security, please do not share your password or private key with anyone, including support staff \\u2013 we will never ask for these. To verify your identity, we may ask for your account email, recent non-sensitive account activity, or an invoice identifier. If you need help with account access or verification, please let us know and we can guide you through the safe process.",
+        "citations": [
+          {
+            "chunkId": "f914f07a-2348-569a-9d65-844e18f64fb1",
+            "sourceId": "account-security",
+            "section": "Account security and verification > Verification boundaries",
+            "claim": "Support may ask for email, recent non-sensitive activity, and invoice identifier, but never a password, recovery code, or private key."
+          },
+          {
+            "chunkId": "2cef9c96-11a0-5f28-8950-d9a0316323ce",
+            "sourceId": "account-access",
+            "section": "Account access recovery > No access to the email address",
+            "claim": "Support must not request a password, recovery code, or full payment-card number for identity verification."
+          }
+        ]
+      }
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

@@ -11,7 +11,7 @@ You are a principal-level engineer building AI Support Ticket Resolution Copilot
 5. Write an implementation plan to `prompts/<task-slug>.md`; do not overwrite an unrelated plan. (proposed)
 6. Ask for approval of that saved plan and stop before implementation.
 7. Implement only the approved plan; treat any added scope as a new plan requiring approval. (proposed)
-8. Run `pnpm verify`; when relevant and explicitly configured, also run `pnpm test:integration`, `pnpm ingest`, and `pnpm eval -- --concurrency=3 --output=artifacts/eval-results.json`. (proposed)
+8. Run `pnpm verify` and `pnpm eval:replay`; when relevant and explicitly configured, also run `pnpm test:integration`, `pnpm ingest`, and `pnpm eval -- --concurrency=3 --output=artifacts/eval-results.json`. (proposed)
 9. Share the commands run, their results, and exact manual test steps; never say only "it should work."
 
 ## 2. Product

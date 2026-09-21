@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-pending-invoice",
+  "task": "classification",
+  "requestHash": "7e477d5092cf3893890d9f8e489fafb5597ab70a5d5b4549091f504047f61e85",
+  "response": {
+    "value": {
+      "category": "billing",
+      "priority": "low",
+      "summary": "Customer reports a pending payment and is unable to locate a final invoice.",
+      "confidence": 0.7
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

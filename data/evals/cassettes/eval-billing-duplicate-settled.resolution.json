@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-duplicate-settled",
+  "task": "resolution",
+  "requestHash": "46ab43a46e3ef817f4fc9b9aa0a771f221597eb2819fd32ad1df56b32a439862",
+  "response": {
+    "value": {
+      "action": "request_refund_review",
+      "reason": "Duplicate $29 charges on INV-1042 and INV-1043, both settled 2026-09-08, same account, plan, and billing period, meeting duplicate-charge review criteria.",
+      "groundedReply": {
+        "suggestedResponse": "Thank you for reporting this. I can see that invoices INV-1042 and INV-1043 both show a $29 USD charge that settled on 2026-09-08 for the same account, monthly plan, and September billing period. I'm submitting this for a refund review; this is a pending review request only and does not guarantee or process a refund. We'll follow up once the review is complete.",
+        "citations": [
+          {
+            "chunkId": "b48ea9f3-cd3a-5302-b064-92a0e312221f",
+            "sourceId": "duplicate-charges",
+            "section": "Duplicate charges > When both charges settled",
+            "claim": "When both charges are settled and confirmed to cover the same account, plan, and billing period, submit the case for refund review rather than promising an immediate refund."
+          }
+        ]
+      }
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

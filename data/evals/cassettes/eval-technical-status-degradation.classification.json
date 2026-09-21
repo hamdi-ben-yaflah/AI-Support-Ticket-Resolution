@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-technical-status-degradation",
+  "task": "classification",
+  "requestHash": "32f4454ca3bd108dda2cfbcfc09ecd2a3d210370c0ec13cac24395d24d5a6933",
+  "response": {
+    "value": {
+      "category": "technical",
+      "priority": "medium",
+      "summary": "Customer reports status page shows degradation and team is unable to use the main feature.",
+      "confidence": 0.6
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

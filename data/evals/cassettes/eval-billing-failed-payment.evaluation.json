@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-failed-payment",
+  "task": "evaluation",
+  "requestHash": "b1b7944ab87928bd1b2c3ddfaeeffd656b9ef8b2750a894d56363a0551936141",
+  "response": {
+    "value": {
+      "decisions": [
+        {
+          "citationId": "7fdcda0f-918c-5074-81ac-4889da435bdb",
+          "supported": true,
+          "rationale": "Evidence directly states to verify expiry date, billing address, funds, retry once, and contact issuer if failures continue, matching the claim."
+        }
+      ]
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

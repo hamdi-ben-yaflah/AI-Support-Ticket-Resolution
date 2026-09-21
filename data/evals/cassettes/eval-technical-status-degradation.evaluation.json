@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-technical-status-degradation",
+  "task": "evaluation",
+  "requestHash": "93c0acf144b9f10d8d470e7f69b4c5081f97f66f4c542ffbe97321b5e462b94f",
+  "response": {
+    "value": {
+      "decisions": [
+        {
+          "citationId": "d2dc1f13-dca4-5ed0-b571-a8bfc8e22aa7",
+          "supported": true,
+          "rationale": "Evidence states escalate when status page reports degradation or core function fails for multiple users, and to record first observed time, region, feature, and symptom, matching the claim."
+        }
+      ]
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}
