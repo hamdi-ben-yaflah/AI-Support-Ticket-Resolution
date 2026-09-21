@@ -2,8 +2,6 @@ name: Live AI evaluation
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "17 3 * * *"
 
 concurrency:
   group: live-ai-evaluation

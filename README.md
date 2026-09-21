@@ -106,7 +106,7 @@ The repository includes a committed `golden.v2` dataset with 36 synthetic cases 
 
 The project uses a two-speed evaluation strategy. Pull requests run committed replay cassettes
 through the real classification, retrieval, grounding, grading, and reporting path without
-provider credentials or network calls. Nightly and manually dispatched workflows run the live
+provider credentials or network calls. A manually dispatched protected workflow runs the live
 providers. A prompt, model, schema, or input change alters the request hash and makes replay fail
 closed until a reviewed live run refreshes the cassettes.
 

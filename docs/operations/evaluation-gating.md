@@ -30,7 +30,7 @@ application's 0.65 defaults.
 ## Live and recording modes
 
 `pnpm eval` retains the existing live behavior. The protected `Live AI evaluation` workflow runs
-nightly and can also be dispatched manually. It uses provider credentials and may incur cost.
+only when manually dispatched. It uses provider credentials and may incur cost.
 
 To refresh fixtures locally, start with a fresh migrated database so deterministic chunk IDs and
 recorded citation IDs agree, then run:
