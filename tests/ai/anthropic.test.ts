@@ -56,6 +56,7 @@ function provider(
     random: () => 0,
   },
   tracing?: AppTracing,
+  promptCacheEnabled?: boolean,
 ) {
   const client = {
     messages: {
@@ -75,8 +76,92 @@ function provider(
     client,
     clock,
     tracing,
+    ...(promptCacheEnabled === undefined ? {} : { promptCacheEnabled }),
   });
 }
+
+describe("AnthropicLlmProvider prompt caching", () => {
+  it("marks the end of the system prompt as an ephemeral cache breakpoint when the request opts in", async () => {
+    const parse = vi.fn().mockResolvedValue(message());
+    await provider(parse).generateStructured({ ...request, cacheableSystemPrompt: true });
+
+    expect(parse.mock.calls[0]?.[0]?.system).toEqual([
+      {
+        type: "text",
+        text: request.system,
+        cache_control: { type: "ephemeral" },
+      },
+    ]);
+  });
+
+  it("leaves the system prompt uncached when the provider disables prompt caching", async () => {
+    const parse = vi.fn().mockResolvedValue(message());
+    await provider(parse, 2, "claude-sonnet-5", undefined, undefined, false).generateStructured({
+      ...request,
+      cacheableSystemPrompt: true,
+    });
+
+    expect(parse.mock.calls[0]?.[0]?.system).toBe(request.system);
+  });
+
+  it("leaves the system prompt uncached when the request does not opt in", async () => {
+    const parse = vi.fn().mockResolvedValue(message());
+    await provider(parse).generateStructured(request);
+
+    expect(parse.mock.calls[0]?.[0]?.system).toBe(request.system);
+  });
+
+  it("sends a byte-identical cached prefix for two tickets with different text", async () => {
+    const parse = vi.fn().mockResolvedValue(message());
+    const cached = { ...request, cacheableSystemPrompt: true };
+    const anthropic = provider(parse);
+    await anthropic.generateStructured({ ...cached, input: "first untrusted ticket" });
+    await anthropic.generateStructured({ ...cached, input: "second untrusted ticket" });
+
+    const [first, second] = parse.mock.calls.map((call) => call[0]);
+    expect(JSON.stringify(first?.system)).toBe(JSON.stringify(second?.system));
+    expect(JSON.stringify(first?.output_config)).toBe(JSON.stringify(second?.output_config));
+    expect(first?.messages).not.toEqual(second?.messages);
+  });
+
+  it("omits cache usage that the provider response does not report", async () => {
+    const parse = vi.fn().mockResolvedValue(
+      message({
+        usage: { input_tokens: 20, output_tokens: 12, cache_read_input_tokens: null },
+      }),
+    );
+    const result = await provider(parse).generateStructured({
+      ...request,
+      cacheableSystemPrompt: true,
+    });
+
+    expect(result.usage).toEqual({ inputTokens: 20, outputTokens: 12 });
+  });
+
+  it("reports cache read and cache write counts when the provider returns them", async () => {
+    const parse = vi.fn().mockResolvedValue(
+      message({
+        usage: {
+          input_tokens: 20,
+          output_tokens: 12,
+          cache_read_input_tokens: 840,
+          cache_creation_input_tokens: 5,
+        },
+      }),
+    );
+    const result = await provider(parse).generateStructured({
+      ...request,
+      cacheableSystemPrompt: true,
+    });
+
+    expect(result.usage).toEqual({
+      inputTokens: 20,
+      outputTokens: 12,
+      cachedInputTokens: 840,
+      cacheWriteInputTokens: 5,
+    });
+  });
+});
 
 describe("AnthropicLlmProvider", () => {
   it("returns validated structured output and normalized telemetry", async () => {
@@ -99,6 +184,16 @@ describe("AnthropicLlmProvider", () => {
       timeout: 10_000,
     });
   });
+
+  it.each(["claude-opus-5", "claude-opus-4-8", "claude-opus-4-7", "claude-fable-5-1"])(
+    "omits the deprecated temperature parameter for %s",
+    async (model) => {
+      const parse = vi.fn().mockResolvedValue(message({ model }));
+      await provider(parse, 2, model).generateStructured(request);
+
+      expect(parse.mock.calls[0]?.[0]).not.toHaveProperty("temperature");
+    },
+  );
 
   it("keeps an explicit temperature for Anthropic models that support it", async () => {
     const parse = vi.fn().mockResolvedValue(message({ model: "claude-sonnet-4-6" }));

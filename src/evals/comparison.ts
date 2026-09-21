@@ -201,6 +201,8 @@ export function compareEvaluationRuns(
     "generationOutputTokens",
     "judgeInputTokens",
     "judgeOutputTokens",
+    "cachedInputTokens",
+    "cacheWriteInputTokens",
     "retryCount",
     "errorCount",
     "estimatedCostUsd",

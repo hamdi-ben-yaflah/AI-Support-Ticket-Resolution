@@ -50,6 +50,8 @@ export const ResolutionRunMetadataSchema = z
     latencyMs: z.number().int().nonnegative(),
     inputTokens: z.number().int().nonnegative(),
     outputTokens: z.number().int().nonnegative(),
+    cachedInputTokens: z.number().int().nonnegative().default(0),
+    cacheWriteInputTokens: z.number().int().nonnegative().default(0),
     retryCount: z.number().int().nonnegative(),
     validationPassed: z.literal(true),
   })

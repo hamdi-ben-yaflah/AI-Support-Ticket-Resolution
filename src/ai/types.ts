@@ -9,6 +9,7 @@ export type GenerateRequest<T> = {
   outputSchema: z.ZodType<T>;
   maxOutputTokens: number;
   temperature?: number;
+  cacheableSystemPrompt?: boolean;
   metadata: {
     traceId: string;
     promptVersion: string;

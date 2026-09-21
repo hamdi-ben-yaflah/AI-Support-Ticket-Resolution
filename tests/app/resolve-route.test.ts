@@ -51,6 +51,8 @@ const execution: ResolutionExecution = {
     latencyMs: 10,
     inputTokens: 20,
     outputTokens: 10,
+    cachedInputTokens: 0,
+    cacheWriteInputTokens: 0,
     retryCount: 0,
     validationPassed: true,
   },

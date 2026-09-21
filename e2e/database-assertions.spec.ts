@@ -77,6 +77,8 @@ async function seedAction(): Promise<void> {
       latencyMs: 1,
       inputTokens: 1,
       outputTokens: 1,
+      cachedInputTokens: 0,
+      cacheWriteInputTokens: 0,
       retryCount: 0,
       validationPassed: true,
     },

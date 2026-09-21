@@ -69,6 +69,8 @@ const classified = {
     promptVersion: "classify.v1",
     inputTokens: 5,
     outputTokens: 3,
+    cachedInputTokens: 0,
+    cacheWriteInputTokens: 0,
     retryCount: 1,
   },
 };
@@ -99,6 +101,63 @@ function provider(value: unknown): LlmProvider {
 function retriever(result = evidence): EvidenceRetriever {
   return { retrieve: vi.fn().mockResolvedValue(result) };
 }
+
+describe("resolution cache telemetry", () => {
+  it("sums classification and resolution cache token counts into execution metadata", async () => {
+    const llm = {
+      name: "fake",
+      model: "fake-model",
+      generateStructured: vi.fn().mockResolvedValue({
+        value: replyDecision,
+        model: "fake-model",
+        finishReason: "end_turn",
+        usage: {
+          inputTokens: 20,
+          outputTokens: 10,
+          cachedInputTokens: 840,
+          cacheWriteInputTokens: 4,
+        },
+        latencyMs: 2,
+        retryCount: 0,
+      }),
+    } as unknown as LlmProvider;
+
+    const result = await resolveTicket(
+      { text: "I was charged twice for the same invoice." },
+      {
+        traceId,
+        classifier: vi.fn().mockResolvedValue({
+          ...classified,
+          metadata: { ...classified.metadata, cachedInputTokens: 290, cacheWriteInputTokens: 1 },
+        }),
+        retriever: retriever(),
+        provider: llm,
+        policy,
+        log: logger(),
+      },
+    );
+
+    expect(result.metadata.cachedInputTokens).toBe(1_130);
+    expect(result.metadata.cacheWriteInputTokens).toBe(5);
+  });
+
+  it("defaults cache token counts to zero when the provider reports none", async () => {
+    const result = await resolveTicket(
+      { text: "I was charged twice for the same invoice." },
+      {
+        traceId,
+        classifier: vi.fn().mockResolvedValue(classified),
+        retriever: retriever(),
+        provider: provider(replyDecision),
+        policy,
+        log: logger(),
+      },
+    );
+
+    expect(result.metadata.cachedInputTokens).toBe(0);
+    expect(result.metadata.cacheWriteInputTokens).toBe(0);
+  });
+});
 
 describe("grounded resolution", () => {
   it("delimits untrusted input and requests either supported reply or abstention", () => {

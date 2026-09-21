@@ -29,6 +29,8 @@ function pair(): [PersistedEvaluationRun, PersistedEvaluationRun] {
     denominator: 30,
   };
   candidate.metrics.operations.latencyP50Ms += 10;
+  candidate.metrics.operations.cachedInputTokens += 1_200;
+  candidate.metrics.operations.cacheWriteInputTokens += 40;
 
   const firstBaseline = baseline.cases[0]!;
   firstBaseline.passed = false;
@@ -67,6 +69,8 @@ describe("evaluation comparison", () => {
 
     expect(comparison.quality.categoryAccuracy.delta).toBeCloseTo(-1 / 30);
     expect(comparison.operations.latencyP50Ms.delta).toBe(10);
+    expect(comparison.operations.cachedInputTokens.delta).toBe(1_200);
+    expect(comparison.operations.cacheWriteInputTokens.delta).toBe(40);
     expect(comparison.operations.estimatedCostUsd.delta).toBeNull();
     expect(comparison.versionDifferences.map((item) => item.field)).toEqual([
       "model",
@@ -98,5 +102,24 @@ describe("evaluation comparison", () => {
     expect(() => compareEvaluationRuns(baseline, otherCases)).toThrowError(
       expect.objectContaining({ code: "incompatible_cases" }),
     );
+  });
+});
+
+describe("persisted evaluation history compatibility", () => {
+  it("parses a run stored before cache telemetry existed", () => {
+    const stored = structuredClone(reportToPersistedRun(report)) as Record<string, unknown>;
+    const metrics = stored.metrics as { operations: Record<string, unknown> };
+    delete metrics.operations.cachedInputTokens;
+    delete metrics.operations.cacheWriteInputTokens;
+    for (const item of stored.cases as { telemetry: Record<string, unknown> }[]) {
+      delete item.telemetry.generationCachedInputTokens;
+      delete item.telemetry.generationCacheWriteTokens;
+      delete item.telemetry.judgeCachedInputTokens;
+      delete item.telemetry.judgeCacheWriteTokens;
+    }
+
+    const parsed = PersistedEvaluationRunSchema.parse(stored);
+    expect(parsed.metrics.operations.cachedInputTokens).toBe(0);
+    expect(parsed.cases[0]?.telemetry.generationCachedInputTokens).toBe(0);
   });
 });

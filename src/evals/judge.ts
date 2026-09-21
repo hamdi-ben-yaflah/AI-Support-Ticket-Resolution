@@ -27,6 +27,7 @@ export async function judgeCitations(input: {
     outputSchema: CitationJudgeOutputSchema,
     maxOutputTokens: 800,
     temperature: 0,
+    cacheableSystemPrompt: true,
     metadata: {
       traceId: input.traceId,
       promptVersion: CITATION_JUDGE_PROMPT_VERSION,

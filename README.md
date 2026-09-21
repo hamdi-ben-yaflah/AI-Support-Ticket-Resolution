@@ -15,6 +15,7 @@ The application classifies synthetic support tickets, retrieves relevant knowled
 - Grounded replies that can safely become `needs_human_review` when evidence is missing, ambiguous, contradictory, or unsupported.
 - A separate confirmation boundary for `request_refund_review`, with signed-session ownership and idempotent mock execution.
 - Versioned golden-dataset evaluations with retrieval, citation, abstention, latency, token, and error metrics.
+- Anthropic system-prompt caching behind a validated flag: 73.6% cache hit rate and 58% lower input-token cost on the golden dataset — see [docs/operations/prompt-caching.md](docs/operations/prompt-caching.md).
 - Redacted structured telemetry and optional metadata-only Langfuse tracing.
 - A server-only V2 foundation for bounded, read-only investigation over five enumerated synthetic tools.
 

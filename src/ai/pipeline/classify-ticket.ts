@@ -32,6 +32,8 @@ export type ClassificationExecution = {
     promptVersion: string;
     inputTokens: number;
     outputTokens: number;
+    cachedInputTokens: number;
+    cacheWriteInputTokens: number;
     retryCount: number;
   };
 };
@@ -47,6 +49,7 @@ export function createClassificationRequest(
     outputSchema: ClassificationSchema,
     maxOutputTokens: 300,
     temperature: 0,
+    cacheableSystemPrompt: true,
     metadata: {
       traceId,
       promptVersion: CLASSIFICATION_PROMPT_VERSION,
@@ -145,6 +148,8 @@ export async function classifyTicketWithMetadata(
             promptVersion: CLASSIFICATION_PROMPT_VERSION,
             inputTokens: result.usage.inputTokens,
             outputTokens: result.usage.outputTokens,
+            cachedInputTokens: result.usage.cachedInputTokens ?? 0,
+            cacheWriteInputTokens: result.usage.cacheWriteInputTokens ?? 0,
             retryCount: result.retryCount,
           },
         };
@@ -214,6 +219,7 @@ export async function classifyTicketWithConfiguredProvider(
     model: config.model,
     timeoutMs: config.requestTimeoutMs,
     maxRetries: config.maxRetries,
+    promptCacheEnabled: config.promptCacheEnabled,
     tracing,
   });
 
