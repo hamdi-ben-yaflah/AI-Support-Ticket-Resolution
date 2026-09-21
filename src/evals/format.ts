@@ -21,7 +21,7 @@ export function formatEvaluationSummary(report: EvaluationReport): string {
   const quality = report.metrics.quality;
   const lines = [
     `Evaluation ${report.status.toUpperCase()} · ${report.dataset.caseCount} cases · ${report.dataset.version}`,
-    `schema ${percent(quality.schemaValidity)} | category ${percent(quality.categoryAccuracy)} | priority ${percent(quality.priorityAccuracy)} | retrieval@5 ${percent(quality.retrievalRecallAt5)} | citations ${percent(quality.citationSupport)} | abstention ${percent(quality.abstentionAccuracy)}`,
+    `schema ${percent(quality.schemaValidity)} | category ${percent(quality.categoryAccuracy)} | priority ${percent(quality.priorityAccuracy)} | retrieval@5 ${percent(quality.retrievalRecallAt5)} | citations ${percent(quality.citationSupport)} | abstention ${percent(quality.abstentionAccuracy)} | abstention rate ${percent(quality.abstentionRate)}`,
     `latency p50 ${report.metrics.operations.latencyP50Ms}ms | p95 ${report.metrics.operations.latencyP95Ms}ms | errors ${report.metrics.operations.errorCount} | retries ${report.metrics.operations.retryCount}`,
     `cache hit ${cacheHitRate(report.metrics.operations)} | cache read ${report.metrics.operations.cachedInputTokens} | cache write ${report.metrics.operations.cacheWriteInputTokens}`,
     ...report.thresholds.map(

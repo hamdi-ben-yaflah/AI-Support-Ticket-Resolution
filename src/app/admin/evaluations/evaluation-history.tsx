@@ -81,7 +81,7 @@ function signed(value: number | null, percent = false, cost = false): string {
 }
 
 function runLabel(run: EvaluationRunSummary): string {
-  return `${new Date(run.completedAt).toLocaleString()} · ${run.runtime.model} · ${run.runId.slice(0, 8)}`;
+  return `${new Date(run.completedAt).toLocaleString()} · ${run.runtime.models?.classification ?? run.runtime.model} → ${run.runtime.models?.resolution ?? run.runtime.model} · ${run.runId.slice(0, 8)}`;
 }
 
 function outcomeStyle(outcome: EvaluationCaseOutcome): string {
@@ -99,7 +99,7 @@ function actualMetadataLabel(
   value: EvaluationComparison["cases"][number]["baseline"]["actual"],
 ): string {
   return value
-    ? `${value.model} (${value.promptVersions.classification}, ${value.promptVersions.resolution})`
+    ? `${value.models?.classification ?? value.model} → ${value.models?.resolution ?? value.model} (${value.promptVersions.classification}, ${value.promptVersions.resolution})`
     : "N/A";
 }
 
@@ -290,7 +290,10 @@ export function EvaluationHistory({ refreshVersion }: { refreshVersion: number }
                   </td>
                   <td className="px-4 py-3">
                     {run.runtime.provider}
-                    <span className="block font-semibold">{run.runtime.model}</span>
+                    <span className="block font-semibold">
+                      {run.runtime.models?.classification ?? run.runtime.model} →{" "}
+                      {run.runtime.models?.resolution ?? run.runtime.model}
+                    </span>
                     <span className="block text-[#74807b]">judge: {run.judgeModel}</span>
                   </td>
                   <td className="px-4 py-3">
@@ -377,7 +380,10 @@ export function EvaluationHistory({ refreshVersion }: { refreshVersion: number }
                     <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#e9d983]">
                       {index === 0 ? "Baseline" : "Candidate"}
                     </p>
-                    <p className="mt-2 font-semibold">{run.runtime.model}</p>
+                    <p className="mt-2 font-semibold">
+                      {run.runtime.models?.classification ?? run.runtime.model} →{" "}
+                      {run.runtime.models?.resolution ?? run.runtime.model}
+                    </p>
                     <p className="mt-1 font-mono text-xs text-[#c6d5d0]">{run.runId}</p>
                     <p className="mt-2 text-xs text-[#c6d5d0]">
                       Classify {run.runtime.promptVersions.classification} · Resolve{" "}

@@ -52,8 +52,19 @@ const EmbeddingCassetteSchema = z
 
 export const CassetteManifestSchema = z
   .object({
-    schemaVersion: z.literal("cassette-manifest.v1"),
-    llm: z.object({ provider: z.literal("anthropic"), model: z.string().trim().min(1) }).strict(),
+    schemaVersion: z.literal("cassette-manifest.v2"),
+    llm: z
+      .object({
+        provider: z.literal("anthropic"),
+        models: z
+          .object({
+            classification: z.string().trim().min(1),
+            resolution: z.string().trim().min(1),
+            judge: z.string().trim().min(1),
+          })
+          .strict(),
+      })
+      .strict(),
     embeddings: z
       .object({
         provider: z.literal("voyage"),
@@ -82,6 +93,15 @@ export const CassetteManifestSchema = z
           .strict(),
       })
       .strict(),
+  })
+  .strict();
+
+const LegacyCassetteManifestSchema = z
+  .object({
+    schemaVersion: z.literal("cassette-manifest.v1"),
+    llm: z.object({ provider: z.literal("anthropic"), model: z.string().trim().min(1) }).strict(),
+    embeddings: CassetteManifestSchema.shape.embeddings,
+    evaluation: CassetteManifestSchema.shape.evaluation,
   })
   .strict();
 
@@ -180,7 +200,22 @@ function embeddingPath(
 export async function loadCassetteManifest(
   directory = DEFAULT_CASSETTE_DIRECTORY,
 ): Promise<CassetteManifest> {
-  return CassetteManifestSchema.parse(await readJson(join(directory, "manifest.json")));
+  const raw = await readJson(join(directory, "manifest.json"));
+  const current = CassetteManifestSchema.safeParse(raw);
+  if (current.success) return current.data;
+  const legacy = LegacyCassetteManifestSchema.parse(raw);
+  return CassetteManifestSchema.parse({
+    ...legacy,
+    schemaVersion: "cassette-manifest.v2",
+    llm: {
+      provider: legacy.llm.provider,
+      models: {
+        classification: legacy.llm.model,
+        resolution: legacy.llm.model,
+        judge: legacy.llm.model,
+      },
+    },
+  });
 }
 
 export async function writeCassetteManifest(

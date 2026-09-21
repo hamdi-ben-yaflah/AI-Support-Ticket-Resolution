@@ -17,7 +17,7 @@ import {
 import type { Classification } from "@/domain/classification";
 import type { ChunkMetadata, DocumentMetadata } from "@/domain/knowledge";
 import type { MockRefundReviewResult, RequestRefundReviewArgs } from "@/domain/refund-review";
-import type { PromptVersions, ResolutionAction } from "@/domain/resolution-run";
+import type { PromptVersions, ResolutionAction, TaskModels } from "@/domain/resolution-run";
 import type { EvaluationCaseResult, EvaluationReport } from "@/evals/contracts";
 
 export const documents = pgTable(
@@ -68,7 +68,7 @@ export const resolutionRuns = pgTable(
     ticketHash: text("ticket_hash").notNull(),
     promptVersions: jsonb("prompt_versions").$type<PromptVersions>().notNull(),
     provider: text("provider").notNull(),
-    model: text("model").notNull(),
+    models: jsonb("models").$type<TaskModels>().notNull(),
     resultStatus: text("result_status").notNull(),
     classification: jsonb("classification").$type<Classification>().notNull(),
     action: jsonb("action").$type<ResolutionAction>().notNull(),
@@ -84,7 +84,10 @@ export const resolutionRuns = pgTable(
     check("resolution_runs_session_hash_sha256", sql`${table.sessionHash} ~ '^[a-f0-9]{64}$'`),
     check("resolution_runs_ticket_hash_sha256", sql`${table.ticketHash} ~ '^[a-f0-9]{64}$'`),
     check("resolution_runs_provider_nonempty", sql`length(trim(${table.provider})) > 0`),
-    check("resolution_runs_model_nonempty", sql`length(trim(${table.model})) > 0`),
+    check(
+      "resolution_runs_models_nonempty",
+      sql`length(trim(${table.models}->>'classification')) > 0 and length(trim(${table.models}->>'resolution')) > 0`,
+    ),
     check("resolution_runs_success", sql`${table.resultStatus} = 'success'`),
     check("resolution_runs_latency_nonnegative", sql`${table.latencyMs} >= 0`),
     check("resolution_runs_input_tokens_nonnegative", sql`${table.inputTokens} >= 0`),
@@ -172,6 +175,7 @@ export const evaluationRuns = pgTable(
     datasetHash: text("dataset_hash").notNull(),
     datasetCaseCount: integer("dataset_case_count").notNull(),
     provider: text("provider").notNull(),
+    classificationModel: text("classification_model").notNull(),
     generationModel: text("generation_model").notNull(),
     judgeModel: text("judge_model").notNull(),
     promptVersions: jsonb("prompt_versions")
@@ -204,6 +208,10 @@ export const evaluationRuns = pgTable(
     check("evaluation_runs_case_count_positive", sql`${table.datasetCaseCount} > 0`),
     check("evaluation_runs_provider_nonempty", sql`length(trim(${table.provider})) > 0`),
     check(
+      "evaluation_runs_classification_model_nonempty",
+      sql`length(trim(${table.classificationModel})) > 0`,
+    ),
+    check(
       "evaluation_runs_generation_model_nonempty",
       sql`length(trim(${table.generationModel})) > 0`,
     ),
@@ -235,6 +243,18 @@ export const evaluationResults = pgTable(
     latencyMs: integer("latency_ms").notNull(),
     generationInputTokens: integer("generation_input_tokens").notNull(),
     generationOutputTokens: integer("generation_output_tokens").notNull(),
+    classificationInputTokens: integer("classification_input_tokens").notNull().default(0),
+    classificationOutputTokens: integer("classification_output_tokens").notNull().default(0),
+    classificationCachedInputTokens: integer("classification_cached_input_tokens")
+      .notNull()
+      .default(0),
+    classificationCacheWriteTokens: integer("classification_cache_write_tokens")
+      .notNull()
+      .default(0),
+    resolutionInputTokens: integer("resolution_input_tokens").notNull().default(0),
+    resolutionOutputTokens: integer("resolution_output_tokens").notNull().default(0),
+    resolutionCachedInputTokens: integer("resolution_cached_input_tokens").notNull().default(0),
+    resolutionCacheWriteTokens: integer("resolution_cache_write_tokens").notNull().default(0),
     judgeInputTokens: integer("judge_input_tokens").notNull(),
     judgeOutputTokens: integer("judge_output_tokens").notNull(),
     retryCount: integer("retry_count").notNull(),

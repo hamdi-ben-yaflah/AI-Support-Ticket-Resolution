@@ -38,7 +38,7 @@ Out of scope:
 - Do not execute real refunds, payments, subscription changes, account changes, or other external side effects.
 - Do not add model training, fine-tuning, prompt self-modification, or online learning. (proposed)
 - Do not add general-purpose autonomy, open-ended tool discovery, arbitrary execution, or multi-agent systems. The approved V2 direction permits only one application-controlled investigation agent with an enumerated read-only synthetic tool allowlist, strict argument/result validation, explicit step/time/token budgets, deterministic termination, and a separate human-confirmed path for mock mutations. (proposed)
-- Do not add another text-generation provider, provider routing, or automatic model fallback. (proposed)
+- Do not add another text-generation provider or automatic model fallback. Static, explicitly configured per-task Anthropic model bindings (`LLM_MODEL_CLASSIFICATION`, `LLM_MODEL_RESOLUTION`, and `LLM_MODEL_JUDGE`) are allowed; do not select models dynamically from ticket content, quality signals, or provider failures. (proposed)
 - Do not add arbitrary file uploads, non-Markdown ingestion, crawling, or a knowledge-base admin UI. (proposed)
 - Do not expose the implemented local-only `/admin/evaluations` console or its APIs in production, and do not expand it into a production analytics dashboard. (proposed)
 - Do not add streaming, chat history, follow-up conversations, or server-owned conversation memory. (proposed)
@@ -94,7 +94,7 @@ Do not use:
   A document requires a stable `source_id`, non-empty title, content hash, schema-valid metadata, and database-generated ID and timestamp before it is saved. (proposed)
 - `document_chunks`: `id`, `document_id`, `chunk_index`, `section`, `content`, `token_count`, `embedding`, `metadata`.
   A chunk requires an existing document, non-negative stable index, non-empty section and content, positive token count, schema-valid metadata, and an embedding whose dimensions match the configured provider before it is saved. (proposed)
-- `resolution_runs`: `id`, `trace_id`, `ticket_hash`, `prompt_versions`, `provider`, `model`, `result_status`, `classification`, `action`, `latency_ms`, `input_tokens`, `output_tokens`, `validation_passed`, `retry_count`, `created_at`. (proposed)
+- `resolution_runs`: `id`, `trace_id`, `ticket_hash`, `prompt_versions`, `provider`, `models`, `result_status`, `classification`, `action`, `latency_ms`, `input_tokens`, `output_tokens`, `validation_passed`, `retry_count`, `created_at`. (proposed)
   A resolution run requires a unique trace ID, one-way ticket hash, prompt versions, provider and model identifiers, status, non-negative telemetry values, validation result, and no raw ticket text before it is saved; successful runs also require schema-valid classification and action. (proposed)
 - `action_audit`: `proposal_id`, `resolution_run_id`, `proposed_arguments`, `state`, `trace_id`, `confirmed_at`, `executed_at`, `result`, `created_at`. (proposed)
   A pending action requires a unique opaque proposal ID, an existing resolution run, schema-valid arguments, and evidence chunk IDs owned by that run before it is saved. (proposed)

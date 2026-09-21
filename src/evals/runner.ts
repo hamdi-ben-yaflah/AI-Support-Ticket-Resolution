@@ -30,7 +30,12 @@ import type { RetrievedEvidence } from "@/retrieval/types";
 
 export type EvaluationRuntime = {
   provider: string;
-  model: string;
+  models?: {
+    classification: string;
+    resolution: string;
+    judge: string;
+  };
+  model?: string;
   promptVersions: {
     classification: string;
     resolution: string;
@@ -153,6 +158,14 @@ async function runCase(
         latencyMs: Math.max(0, now().getTime() - startedAt),
         generationInputTokens: 0,
         generationOutputTokens: 0,
+        classificationInputTokens: 0,
+        classificationOutputTokens: 0,
+        classificationCachedInputTokens: 0,
+        classificationCacheWriteTokens: 0,
+        resolutionInputTokens: 0,
+        resolutionOutputTokens: 0,
+        resolutionCachedInputTokens: 0,
+        resolutionCacheWriteTokens: 0,
         generationCachedInputTokens: 0,
         generationCacheWriteTokens: 0,
         judgeInputTokens: 0,
@@ -178,6 +191,10 @@ async function runCase(
 
   const decisions = judge?.value.decisions ?? [];
   const scores = gradeExecution({ goldenCase, execution, retrieved, judgeDecisions: decisions });
+  const executionModels = execution.metadata.models ?? {
+    classification: execution.metadata.model ?? "legacy",
+    resolution: execution.metadata.model ?? "legacy",
+  };
   const citedChunkIds = execution.citedSources.map((source) => source.chunkId);
   const citedSourceIds = unique(execution.citedSources.map((source) => source.sourceId));
   const partial = {
@@ -194,7 +211,10 @@ async function runCase(
       retrievedChunkIds: retrieved.map((item) => item.chunkId),
       retrievedSourceIds: unique(retrieved.map((item) => item.sourceId)),
       provider: execution.metadata.provider,
-      model: execution.metadata.model,
+      models: {
+        classification: executionModels.classification,
+        resolution: executionModels.resolution,
+      },
       promptVersions: execution.metadata.promptVersions,
     },
     scores,
@@ -203,6 +223,22 @@ async function runCase(
       latencyMs: Math.max(execution.metadata.latencyMs, now().getTime() - startedAt),
       generationInputTokens: execution.metadata.inputTokens,
       generationOutputTokens: execution.metadata.outputTokens,
+      classificationInputTokens:
+        execution.metadata.taskUsage?.classification.inputTokens ?? execution.metadata.inputTokens,
+      classificationOutputTokens:
+        execution.metadata.taskUsage?.classification.outputTokens ??
+        execution.metadata.outputTokens,
+      classificationCachedInputTokens:
+        execution.metadata.taskUsage?.classification.cachedInputTokens ??
+        execution.metadata.cachedInputTokens,
+      classificationCacheWriteTokens:
+        execution.metadata.taskUsage?.classification.cacheWriteInputTokens ??
+        execution.metadata.cacheWriteInputTokens,
+      resolutionInputTokens: execution.metadata.taskUsage?.resolution.inputTokens ?? 0,
+      resolutionOutputTokens: execution.metadata.taskUsage?.resolution.outputTokens ?? 0,
+      resolutionCachedInputTokens: execution.metadata.taskUsage?.resolution.cachedInputTokens ?? 0,
+      resolutionCacheWriteTokens:
+        execution.metadata.taskUsage?.resolution.cacheWriteInputTokens ?? 0,
       generationCachedInputTokens: execution.metadata.cachedInputTokens,
       generationCacheWriteTokens: execution.metadata.cacheWriteInputTokens,
       judgeInputTokens: judge?.usage.inputTokens ?? 0,
@@ -278,7 +314,7 @@ export async function runEvaluation(input: RunEvaluationInput): Promise<Evaluati
   const thresholds = evaluateThresholds(quality);
   const status = thresholds.every((threshold) => threshold.passed) ? "pass" : "regression";
   const sum = (field: keyof EvaluationCaseResult["telemetry"]) =>
-    results.reduce((total, result) => total + result.telemetry[field], 0);
+    results.reduce((total, result) => total + (result.telemetry[field] ?? 0), 0);
 
   return EvaluationReportSchema.parse({
     schemaVersion: "evaluation-report.v1",
@@ -293,7 +329,11 @@ export async function runEvaluation(input: RunEvaluationInput): Promise<Evaluati
     },
     runtime: {
       provider: input.runtime.provider,
-      model: input.runtime.model,
+      models: input.runtime.models ?? {
+        classification: input.runtime.model!,
+        resolution: input.runtime.model!,
+        judge: input.runtime.model!,
+      },
       promptVersions: {
         ...input.runtime.promptVersions,
         citationJudge: CITATION_JUDGE_PROMPT_VERSION,

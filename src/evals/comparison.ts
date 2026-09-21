@@ -120,7 +120,24 @@ export function compareEvaluationRuns(
   assertCompatible(baseline, candidate);
 
   const versionDifferences = compact([
-    difference("model", "Generation model", baseline.runtime.model, candidate.runtime.model),
+    difference(
+      "model",
+      "Generation model",
+      baseline.runtime.model ?? baseline.runtime.models?.resolution ?? "legacy",
+      candidate.runtime.model ?? candidate.runtime.models?.resolution ?? "legacy",
+    ),
+    difference(
+      "models.classification",
+      "Classification model",
+      baseline.runtime.models?.classification ?? baseline.runtime.model ?? "legacy",
+      candidate.runtime.models?.classification ?? candidate.runtime.model ?? "legacy",
+    ),
+    difference(
+      "models.resolution",
+      "Resolution model",
+      baseline.runtime.models?.resolution ?? baseline.runtime.model ?? "legacy",
+      candidate.runtime.models?.resolution ?? candidate.runtime.model ?? "legacy",
+    ),
     difference("judgeModel", "Citation judge model", baseline.judgeModel, candidate.judgeModel),
     difference(
       "prompt.classification",
@@ -187,6 +204,7 @@ export function compareEvaluationRuns(
     "abstentionAccuracy",
     "abstentionPrecision",
     "abstentionRecall",
+    "abstentionRate",
   ] as const;
   const quality = Object.fromEntries(
     qualityKeys.map((key) => [

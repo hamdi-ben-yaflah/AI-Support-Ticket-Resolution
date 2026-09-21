@@ -144,6 +144,7 @@ const QualityDeltasSchema = z
     abstentionAccuracy: QualityMetricDeltaSchema,
     abstentionPrecision: QualityMetricDeltaSchema,
     abstentionRecall: QualityMetricDeltaSchema,
+    abstentionRate: QualityMetricDeltaSchema,
   })
   .strict();
 

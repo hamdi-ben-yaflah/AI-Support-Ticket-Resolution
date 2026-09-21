@@ -41,12 +41,34 @@ export const ResolutionPolicyMetadataSchema = z
   })
   .strict();
 
+export const TaskModelsSchema = z
+  .object({
+    classification: z.string().trim().min(1).max(200),
+    resolution: z.string().trim().min(1).max(200),
+  })
+  .strict();
+
+const TaskUsageSchema = z
+  .object({
+    inputTokens: z.number().int().nonnegative(),
+    outputTokens: z.number().int().nonnegative(),
+    cachedInputTokens: z.number().int().nonnegative().default(0),
+    cacheWriteInputTokens: z.number().int().nonnegative().default(0),
+  })
+  .strict();
+
 export const ResolutionRunMetadataSchema = z
   .object({
     promptVersions: PromptVersionsSchema,
     resolutionPolicy: ResolutionPolicyMetadataSchema,
     provider: z.string().trim().min(1).max(120),
-    model: z.string().trim().min(1).max(200),
+    models: TaskModelsSchema.optional(),
+    /** @deprecated Accepted only to read pre-routing fixtures; writes use models. */
+    model: z.string().trim().min(1).max(200).optional(),
+    taskUsage: z
+      .object({ classification: TaskUsageSchema, resolution: TaskUsageSchema })
+      .strict()
+      .optional(),
     latencyMs: z.number().int().nonnegative(),
     inputTokens: z.number().int().nonnegative(),
     outputTokens: z.number().int().nonnegative(),
@@ -55,7 +77,12 @@ export const ResolutionRunMetadataSchema = z
     retryCount: z.number().int().nonnegative(),
     validationPassed: z.literal(true),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (!value.models && !value.model) {
+      context.addIssue({ code: "custom", path: ["models"], message: "Task models are required." });
+    }
+  });
 
 export const CitedSourceSnapshotSchema = SourceDetailSchema.extend({
   citationPosition: z.number().int().nonnegative(),
@@ -179,3 +206,4 @@ export type ResolutionRunMetadata = z.infer<typeof ResolutionRunMetadataSchema>;
 export type PersistedResolutionRun = z.infer<typeof PersistedResolutionRunSchema>;
 export type PromptVersions = z.infer<typeof PromptVersionsSchema>;
 export type ResolutionAction = z.infer<typeof ResolutionActionSchema>;
+export type TaskModels = z.infer<typeof TaskModelsSchema>;
