@@ -119,8 +119,12 @@ describe("evaluation graders", () => {
         latencyMs: 1,
         generationInputTokens: 1,
         generationOutputTokens: 1,
+        generationCachedInputTokens: 0,
+        generationCacheWriteTokens: 0,
         judgeInputTokens: 1,
         judgeOutputTokens: 1,
+        judgeCachedInputTokens: 0,
+        judgeCacheWriteTokens: 0,
         retryCount: 0,
       },
       error: null,
@@ -213,6 +217,77 @@ describe("citation judge", () => {
   });
 });
 
+describe("cache-aware evaluation cost", () => {
+  it("totals cache tokens and charges reads and writes at their own rates", async () => {
+    const cases = makeGoldenCases();
+    const cachedExecution = {
+      ...makeExecution(),
+      metadata: {
+        ...makeExecution().metadata,
+        cachedInputTokens: 800,
+        cacheWriteInputTokens: 10,
+      },
+    };
+    const report = await runEvaluation({
+      dataset: { version: "golden.v2", sha256: "d".repeat(64), cases },
+      concurrency: 3,
+      runtime: {
+        provider: "fake",
+        model: "fake-model",
+        promptVersions: { classification: "classify.v1", resolution: "resolve.v4" },
+        retrieval: {
+          version: "retrieval.v1",
+          candidateCount: 8,
+          finalCount: 5,
+          minimumSimilarity: 0.65,
+          maximumContextTokens: 3_500,
+          minimumEvidenceCount: 1,
+        },
+        resolutionPolicy: { version: "resolution-policy.v1", minimumConfidence: 0.65 },
+        pricing: {
+          inputUsdPerMillion: 1_000_000,
+          outputUsdPerMillion: 0,
+          cacheReadUsdPerMillion: 100_000,
+          cacheWriteUsdPerMillion: 2_000_000,
+        },
+      },
+      dependencies: {
+        execute: async (_item, context) => {
+          context.recordRetrieved(makeEvidence());
+          return cachedExecution;
+        },
+        judge: async () => ({
+          value: {
+            decisions: [
+              { citationId: evaluationChunkId, supported: true, rationale: "Direct support." },
+            ],
+          },
+          model: "fake-model",
+          finishReason: "end_turn",
+          usage: {
+            inputTokens: 5,
+            outputTokens: 3,
+            cachedInputTokens: 100,
+            cacheWriteInputTokens: 2,
+          },
+          latencyMs: 1,
+          retryCount: 0,
+        }),
+      },
+      createId: () => evaluationTraceId,
+    });
+
+    const caseCount = cases.length;
+    expect(report.metrics.operations.cachedInputTokens).toBe(900 * caseCount);
+    expect(report.metrics.operations.cacheWriteInputTokens).toBe(12 * caseCount);
+    // 25 uncached input + 900 cache reads + 12 cache writes per case, each at its own rate.
+    expect(report.metrics.operations.estimatedCostUsd).toBeCloseTo(
+      caseCount * (25 * 1 + 900 * 0.1 + 12 * 2),
+      6,
+    );
+  });
+});
+
 describe("shared evaluation runner", () => {
   it("bounds concurrency, preserves order, computes cost, and omits ticket content", async () => {
     const cases = makeGoldenCases();
@@ -235,7 +310,12 @@ describe("shared evaluation runner", () => {
           minimumEvidenceCount: 1,
         },
         resolutionPolicy: { version: "resolution-policy.v1", minimumConfidence: 0.65 },
-        pricing: { inputUsdPerMillion: 1, outputUsdPerMillion: 2 },
+        pricing: {
+          inputUsdPerMillion: 1,
+          outputUsdPerMillion: 2,
+          cacheReadUsdPerMillion: 0.1,
+          cacheWriteUsdPerMillion: 1.25,
+        },
       },
       dependencies: {
         execute: async (_item, context) => {

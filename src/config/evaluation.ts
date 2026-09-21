@@ -11,17 +11,25 @@ const EvaluationConfigSchema = z
   .object({
     EVAL_ANTHROPIC_INPUT_USD_PER_MILLION: OptionalPriceSchema,
     EVAL_ANTHROPIC_OUTPUT_USD_PER_MILLION: OptionalPriceSchema,
+    EVAL_ANTHROPIC_CACHE_READ_USD_PER_MILLION: OptionalPriceSchema,
+    EVAL_ANTHROPIC_CACHE_WRITE_USD_PER_MILLION: OptionalPriceSchema,
   })
   .refine(
     (value) =>
-      (value.EVAL_ANTHROPIC_INPUT_USD_PER_MILLION === undefined) ===
-      (value.EVAL_ANTHROPIC_OUTPUT_USD_PER_MILLION === undefined),
-    { message: "Both evaluation price values must be configured together." },
+      new Set([
+        value.EVAL_ANTHROPIC_INPUT_USD_PER_MILLION === undefined,
+        value.EVAL_ANTHROPIC_OUTPUT_USD_PER_MILLION === undefined,
+        value.EVAL_ANTHROPIC_CACHE_READ_USD_PER_MILLION === undefined,
+        value.EVAL_ANTHROPIC_CACHE_WRITE_USD_PER_MILLION === undefined,
+      ]).size === 1,
+    { message: "All evaluation price values must be configured together." },
   );
 
 export type EvaluationPricing = {
   inputUsdPerMillion: number;
   outputUsdPerMillion: number;
+  cacheReadUsdPerMillion: number;
+  cacheWriteUsdPerMillion: number;
 } | null;
 
 export function getEvaluationPricing(
@@ -35,5 +43,7 @@ export function getEvaluationPricing(
   return {
     inputUsdPerMillion: parsed.data.EVAL_ANTHROPIC_INPUT_USD_PER_MILLION,
     outputUsdPerMillion: parsed.data.EVAL_ANTHROPIC_OUTPUT_USD_PER_MILLION ?? 0,
+    cacheReadUsdPerMillion: parsed.data.EVAL_ANTHROPIC_CACHE_READ_USD_PER_MILLION ?? 0,
+    cacheWriteUsdPerMillion: parsed.data.EVAL_ANTHROPIC_CACHE_WRITE_USD_PER_MILLION ?? 0,
   };
 }

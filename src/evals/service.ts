@@ -31,6 +31,7 @@ export async function runConfiguredEvaluation(concurrency = 3) {
       model: aiConfig.model,
       timeoutMs: aiConfig.requestTimeoutMs,
       maxRetries: aiConfig.maxRetries,
+      promptCacheEnabled: aiConfig.promptCacheEnabled,
     });
     const retriever = createConfiguredEvidenceRetriever();
     const log = createLogger(aiConfig.logLevel);

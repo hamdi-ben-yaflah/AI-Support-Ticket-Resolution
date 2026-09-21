@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { TextBlockParam } from "@anthropic-ai/sdk/resources/messages";
 import Anthropic, {
   APIConnectionError,
   APIConnectionTimeoutError,
@@ -42,6 +43,7 @@ type AnthropicProviderOptions = {
   model: string;
   timeoutMs: number;
   maxRetries: number;
+  promptCacheEnabled?: boolean;
   client?: Anthropic;
   clock?: Partial<Clock>;
   tracing?: AppTracing;
@@ -165,6 +167,7 @@ export class AnthropicLlmProvider implements LlmProvider {
   private readonly client: Anthropic;
   private readonly timeoutMs: number;
   private readonly maxRetries: number;
+  private readonly promptCacheEnabled: boolean;
   private readonly clock: Clock;
   private readonly tracing: AppTracing;
 
@@ -172,6 +175,7 @@ export class AnthropicLlmProvider implements LlmProvider {
     this.model = options.model;
     this.timeoutMs = options.timeoutMs;
     this.maxRetries = options.maxRetries;
+    this.promptCacheEnabled = options.promptCacheEnabled ?? true;
     this.client =
       options.client ??
       new Anthropic({
@@ -180,6 +184,14 @@ export class AnthropicLlmProvider implements LlmProvider {
       });
     this.clock = { ...defaultClock, ...options.clock };
     this.tracing = options.tracing ?? tracing;
+  }
+
+  private systemParameter(request: GenerateRequest<unknown>): string | TextBlockParam[] {
+    if (!request.cacheableSystemPrompt || !this.promptCacheEnabled) {
+      return request.system;
+    }
+
+    return [{ type: "text", text: request.system, cache_control: { type: "ephemeral" } }];
   }
 
   async generateStructured<T>(request: GenerateRequest<T>): Promise<GenerateResult<T>> {
@@ -204,7 +216,7 @@ export class AnthropicLlmProvider implements LlmProvider {
           {
             model: this.model,
             max_tokens: request.maxOutputTokens,
-            system: request.system,
+            system: this.systemParameter(request),
             messages: [{ role: "user", content: request.input }],
             metadata: { user_id: request.metadata.traceId },
             output_config: {

@@ -155,6 +155,8 @@ const OperationalDeltasSchema = z
     generationOutputTokens: NullableNumberDeltaSchema,
     judgeInputTokens: NullableNumberDeltaSchema,
     judgeOutputTokens: NullableNumberDeltaSchema,
+    cachedInputTokens: NullableNumberDeltaSchema,
+    cacheWriteInputTokens: NullableNumberDeltaSchema,
     retryCount: NullableNumberDeltaSchema,
     errorCount: NullableNumberDeltaSchema,
     estimatedCostUsd: NullableNumberDeltaSchema,

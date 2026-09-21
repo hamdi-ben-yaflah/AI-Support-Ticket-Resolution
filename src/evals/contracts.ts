@@ -154,8 +154,12 @@ export const EvaluationCaseResultSchema = z
         latencyMs: z.number().int().nonnegative(),
         generationInputTokens: z.number().int().nonnegative(),
         generationOutputTokens: z.number().int().nonnegative(),
+        generationCachedInputTokens: z.number().int().nonnegative().default(0),
+        generationCacheWriteTokens: z.number().int().nonnegative().default(0),
         judgeInputTokens: z.number().int().nonnegative(),
         judgeOutputTokens: z.number().int().nonnegative(),
+        judgeCachedInputTokens: z.number().int().nonnegative().default(0),
+        judgeCacheWriteTokens: z.number().int().nonnegative().default(0),
         retryCount: z.number().int().nonnegative(),
       })
       .strict(),
@@ -252,6 +256,8 @@ export const EvaluationReportSchema = z
           .object({
             inputUsdPerMillion: z.number().nonnegative(),
             outputUsdPerMillion: z.number().nonnegative(),
+            cacheReadUsdPerMillion: z.number().nonnegative().default(0),
+            cacheWriteUsdPerMillion: z.number().nonnegative().default(0),
           })
           .strict()
           .nullable(),
@@ -268,6 +274,8 @@ export const EvaluationReportSchema = z
             generationOutputTokens: z.number().int().nonnegative(),
             judgeInputTokens: z.number().int().nonnegative(),
             judgeOutputTokens: z.number().int().nonnegative(),
+            cachedInputTokens: z.number().int().nonnegative().default(0),
+            cacheWriteInputTokens: z.number().int().nonnegative().default(0),
             averageGenerationInputTokens: z.number().nonnegative(),
             averageGenerationOutputTokens: z.number().nonnegative(),
             averageJudgeInputTokens: z.number().nonnegative(),

@@ -110,6 +110,11 @@ function createExecutionMetadata(input: {
     latencyMs: Math.max(0, Date.now() - input.pipelineStartedAt),
     inputTokens: input.classified.metadata.inputTokens + (generated?.usage.inputTokens ?? 0),
     outputTokens: input.classified.metadata.outputTokens + (generated?.usage.outputTokens ?? 0),
+    cachedInputTokens:
+      input.classified.metadata.cachedInputTokens + (generated?.usage.cachedInputTokens ?? 0),
+    cacheWriteInputTokens:
+      input.classified.metadata.cacheWriteInputTokens +
+      (generated?.usage.cacheWriteInputTokens ?? 0),
     retryCount: input.classified.metadata.retryCount + (generated?.retryCount ?? 0),
     validationPassed: true,
   };
@@ -128,6 +133,7 @@ export function createResolutionRequest(input: {
     outputSchema: ResolutionDecisionSchema,
     maxOutputTokens: 1_200,
     temperature: 0,
+    cacheableSystemPrompt: true,
     metadata: {
       traceId: input.traceId,
       promptVersion: RESOLUTION_PROMPT_VERSION,
@@ -592,6 +598,7 @@ export async function resolveTicketWithConfiguredProviders(
     model: config.model,
     timeoutMs: config.requestTimeoutMs,
     maxRetries: config.maxRetries,
+    promptCacheEnabled: config.promptCacheEnabled,
     tracing,
   });
   const retriever: EvidenceRetriever = {

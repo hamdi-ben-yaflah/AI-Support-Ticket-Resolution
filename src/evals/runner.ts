@@ -150,8 +150,12 @@ async function runCase(
         latencyMs: Math.max(0, now().getTime() - startedAt),
         generationInputTokens: 0,
         generationOutputTokens: 0,
+        generationCachedInputTokens: 0,
+        generationCacheWriteTokens: 0,
         judgeInputTokens: 0,
         judgeOutputTokens: 0,
+        judgeCachedInputTokens: 0,
+        judgeCacheWriteTokens: 0,
         retryCount: isLlmError(error) ? error.retryCount : 0,
       },
       error: safeCaseError(error, "resolution"),
@@ -195,8 +199,12 @@ async function runCase(
       latencyMs: Math.max(execution.metadata.latencyMs, now().getTime() - startedAt),
       generationInputTokens: execution.metadata.inputTokens,
       generationOutputTokens: execution.metadata.outputTokens,
+      generationCachedInputTokens: execution.metadata.cachedInputTokens,
+      generationCacheWriteTokens: execution.metadata.cacheWriteInputTokens,
       judgeInputTokens: judge?.usage.inputTokens ?? 0,
       judgeOutputTokens: judge?.usage.outputTokens ?? 0,
+      judgeCachedInputTokens: judge?.usage.cachedInputTokens ?? 0,
+      judgeCacheWriteTokens: judge?.usage.cacheWriteInputTokens ?? 0,
       retryCount: execution.metadata.retryCount + (judge?.retryCount ?? 0),
     },
     error: judgeError,
@@ -236,8 +244,21 @@ function estimateCost(
     (sum, item) => sum + item.telemetry.generationOutputTokens + item.telemetry.judgeOutputTokens,
     0,
   );
+  const cacheReadTokens = results.reduce(
+    (sum, item) =>
+      sum + item.telemetry.generationCachedInputTokens + item.telemetry.judgeCachedInputTokens,
+    0,
+  );
+  const cacheWriteTokens = results.reduce(
+    (sum, item) =>
+      sum + item.telemetry.generationCacheWriteTokens + item.telemetry.judgeCacheWriteTokens,
+    0,
+  );
   return (
-    (inputTokens * pricing.inputUsdPerMillion + outputTokens * pricing.outputUsdPerMillion) /
+    (inputTokens * pricing.inputUsdPerMillion +
+      outputTokens * pricing.outputUsdPerMillion +
+      cacheReadTokens * pricing.cacheReadUsdPerMillion +
+      cacheWriteTokens * pricing.cacheWriteUsdPerMillion) /
     1_000_000
   );
 }
@@ -293,6 +314,8 @@ export async function runEvaluation(input: RunEvaluationInput): Promise<Evaluati
         generationOutputTokens: sum("generationOutputTokens"),
         judgeInputTokens: sum("judgeInputTokens"),
         judgeOutputTokens: sum("judgeOutputTokens"),
+        cachedInputTokens: sum("generationCachedInputTokens") + sum("judgeCachedInputTokens"),
+        cacheWriteInputTokens: sum("generationCacheWriteTokens") + sum("judgeCacheWriteTokens"),
         averageGenerationInputTokens: sum("generationInputTokens") / results.length,
         averageGenerationOutputTokens: sum("generationOutputTokens") / results.length,
         averageJudgeInputTokens: sum("judgeInputTokens") / results.length,
