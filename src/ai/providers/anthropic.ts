@@ -157,8 +157,19 @@ function isRetryable(error: LlmError, retryCount: number, maxRetries: number): b
   return error.code !== "timeout" || retryCount === 0;
 }
 
+const MODELS_WITHOUT_TEMPERATURE = new Set([
+  "claude-opus-5",
+  "claude-opus-4-8",
+  "claude-opus-4-7",
+  "claude-sonnet-5",
+]);
+
 function supportsExplicitTemperature(model: string): boolean {
-  return model !== "claude-sonnet-5";
+  return (
+    !MODELS_WITHOUT_TEMPERATURE.has(model) &&
+    !model.startsWith("claude-fable-") &&
+    !model.startsWith("claude-mythos-")
+  );
 }
 
 export class AnthropicLlmProvider implements LlmProvider {

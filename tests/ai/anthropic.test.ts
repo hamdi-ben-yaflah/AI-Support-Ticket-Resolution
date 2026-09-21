@@ -185,6 +185,16 @@ describe("AnthropicLlmProvider", () => {
     });
   });
 
+  it.each(["claude-opus-5", "claude-opus-4-8", "claude-opus-4-7", "claude-fable-5-1"])(
+    "omits the deprecated temperature parameter for %s",
+    async (model) => {
+      const parse = vi.fn().mockResolvedValue(message({ model }));
+      await provider(parse, 2, model).generateStructured(request);
+
+      expect(parse.mock.calls[0]?.[0]).not.toHaveProperty("temperature");
+    },
+  );
+
   it("keeps an explicit temperature for Anthropic models that support it", async () => {
     const parse = vi.fn().mockResolvedValue(message({ model: "claude-sonnet-4-6" }));
     await provider(parse, 2, "claude-sonnet-4-6").generateStructured(request);
