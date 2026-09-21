@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-no-refund-guarantee",
+  "task": "resolution",
+  "requestHash": "db558fe4843ce6529683b7f004bea926599656e9ef02af48ea3c612b9f924a40",
+  "response": {
+    "value": {
+      "action": "reply",
+      "reason": "Ticket asks if refund approval can be guaranteed; policy explicitly states refunds are not automatic and approval cannot be guaranteed, so a direct informational reply is appropriate.",
+      "groundedReply": {
+        "suggestedResponse": "Thank you for reaching out. I want to be transparent: refunds are not automatic, and we cannot guarantee that any refund request will be approved. Each request is reviewed individually, taking into account factors such as service usage, whether the charge was a duplicate, and applicable consumer protections. If you'd like to proceed, please note that requests must be submitted within 14 calendar days of the charge, and we'll do our best to review your case fairly.",
+        "citations": [
+          {
+            "chunkId": "9549dc2f-00e8-574d-b368-236439a5ca73",
+            "sourceId": "refund-policy",
+            "section": "Refund review policy > Eligibility review",
+            "claim": "Refunds are not automatic, must be requested within 14 days, and support must not guarantee approval; review considers usage, duplicate billing, and consumer protections."
+          }
+        ]
+      }
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

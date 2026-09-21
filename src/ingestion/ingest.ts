@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -14,9 +15,17 @@ export type IngestionRepository = {
     title: string;
     contentHash: string;
     metadata: ParsedKnowledgeDocument["metadata"];
-    chunks: Array<ParsedKnowledgeDocument["chunks"][number] & { embedding: number[] }>;
+    chunks: Array<ParsedKnowledgeDocument["chunks"][number] & { id: string; embedding: number[] }>;
   }): Promise<void>;
 };
+
+export function stableChunkId(sourceId: string, chunkIndex: number): string {
+  const bytes = createHash("sha256").update(`${sourceId}:${chunkIndex}`).digest().subarray(0, 16);
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x50;
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 export type IngestionSummary = {
   files: number;
@@ -79,6 +88,7 @@ async function embedDocument(
 
   return document.chunks.map((chunk, index) => ({
     ...chunk,
+    id: stableChunkId(document.sourceId, chunk.chunkIndex),
     embedding: vectors[index] as number[],
   }));
 }

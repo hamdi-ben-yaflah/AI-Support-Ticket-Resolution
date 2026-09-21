@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-account-email-unavailable",
+  "task": "evaluation",
+  "requestHash": "2db86990e1bca219b83bd71a863c613760278eb386dbd41dab8fdc36e60919ed",
+  "response": {
+    "value": {
+      "decisions": [
+        {
+          "citationId": "2cef9c96-11a0-5f28-8950-d9a0316323ce",
+          "supported": true,
+          "rationale": "Evidence directly states routing to identity verification instead of changing email based on ticket, and prohibits requesting password, recovery code, or card number, matching claim."
+        }
+      ]
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

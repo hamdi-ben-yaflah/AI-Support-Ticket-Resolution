@@ -1,7 +1,11 @@
 import type { EvaluationMetric, EvaluationReport } from "@/evals/contracts";
 
 function percent(metric: EvaluationMetric): string {
-  return metric.value === null ? "n/a" : `${(metric.value * 100).toFixed(1)}%`;
+  if (metric.value === null) return "n/a";
+  const actual = metric.value.toFixed(3);
+  return metric.lowerBound === null || metric.upperBound === null
+    ? actual
+    : `${actual} (95% CI ${metric.lowerBound.toFixed(2)}–${metric.upperBound.toFixed(2)})`;
 }
 
 function cacheHitRate(operations: EvaluationReport["metrics"]["operations"]): string {
@@ -22,7 +26,7 @@ export function formatEvaluationSummary(report: EvaluationReport): string {
     `cache hit ${cacheHitRate(report.metrics.operations)} | cache read ${report.metrics.operations.cachedInputTokens} | cache write ${report.metrics.operations.cacheWriteInputTokens}`,
     ...report.thresholds.map(
       (item) =>
-        `${item.passed ? "PASS" : "FAIL"} ${item.metric}: ${item.actual === null ? "n/a" : `${(item.actual * 100).toFixed(1)}%`} >= ${(item.threshold * 100).toFixed(1)}%`,
+        `${item.passed ? "PASS" : "FAIL"} ${item.metric}: ${item.actual === null ? "n/a" : item.actual.toFixed(3)}${item.lowerBound === null ? "" : ` (lower 95% bound ${item.lowerBound.toFixed(3)})`} >= ${item.threshold.toFixed(3)}`,
     ),
   ];
   const failures = report.cases.filter((item) => !item.passed);

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-refund-window",
+  "task": "evaluation",
+  "requestHash": "651c6f9d393b20ae72cc355e177bffb1e57fa6ddd9fdd921adfb02184d473d0b",
+  "response": {
+    "value": {
+      "decisions": [
+        {
+          "citationId": "9549dc2f-00e8-574d-b368-236439a5ca73",
+          "supported": true,
+          "rationale": "Evidence directly states refunds are not automatic, review can be requested within 14 days, and support must not guarantee approval, matching the claim exactly."
+        }
+      ]
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

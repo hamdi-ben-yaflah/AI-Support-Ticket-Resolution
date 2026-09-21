@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-invoice-location",
+  "task": "classification",
+  "requestHash": "15aaf461ef720eeb2e539e39525f201a35f345151107dfdd428162375522d727",
+  "response": {
+    "value": {
+      "category": "billing",
+      "priority": "low",
+      "summary": "Customer requesting location to download invoice for a completed payment.",
+      "confidence": 0.9
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

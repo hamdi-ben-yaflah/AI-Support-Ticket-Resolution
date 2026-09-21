@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-contradictory-refund-date",
+  "task": "classification",
+  "requestHash": "ecd96471e7565f75b2135908e8885f6886f5f014655b1f35f23f9a85a5273b72",
+  "response": {
+    "value": {
+      "category": "billing",
+      "priority": "medium",
+      "summary": "Customer reports being charged both yesterday and six months ago, requesting an immediate refund.",
+      "confidence": 0.6
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

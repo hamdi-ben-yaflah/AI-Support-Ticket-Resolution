@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-other-product-roadmap",
+  "task": "classification",
+  "requestHash": "63f8740272a78170992ae755abe7f6c1d27970a553da9fbcec37c30fb76d9257",
+  "response": {
+    "value": {
+      "category": "other",
+      "priority": "low",
+      "summary": "Customer requests unreleased product roadmap dates for the next two years.",
+      "confidence": 0.7
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

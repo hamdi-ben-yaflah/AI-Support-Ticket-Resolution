@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-technical-status-degradation",
+  "task": "resolution",
+  "requestHash": "0c4ca7256586653e6a64a7e1f4ccb9f496e36ceecc231ac7cdfcf8ce6f851b8b",
+  "response": {
+    "value": {
+      "action": "reply",
+      "reason": "Ticket describes a possible incident (status page degradation, core feature unusable) but is missing details needed for escalation per the incident escalation policy.",
+      "groundedReply": {
+        "suggestedResponse": "Thanks for reporting this. Because you're seeing a status page degradation alongside your team's inability to use the main feature, this may need to be escalated as a possible incident. To help us assess and escalate this properly, could you provide: (1) the time you first noticed the issue, (2) the region your team is in, (3) which specific feature is affected, and (4) a brief description of the symptom you're experiencing? Once we have these details, we can move forward with the appropriate escalation.",
+        "citations": [
+          {
+            "chunkId": "d2dc1f13-dca4-5ed0-b571-a8bfc8e22aa7",
+            "sourceId": "incident-escalation",
+            "section": "Incident escalation > Possible incident",
+            "claim": "Escalate when the status page reports degradation or a core function fails for multiple users, and record the first observed time, affected region, feature, and a concise symptom."
+          }
+        ]
+      }
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

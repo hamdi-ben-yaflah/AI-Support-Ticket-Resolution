@@ -1,0 +1,82 @@
+name: Record AI evaluation cassettes
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: record-ai-evaluation-cassettes
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "24"
+  PNPM_VERSION: "11.21.0"
+  DATABASE_URL: postgresql://support_copilot_record:support_copilot_record@127.0.0.1:5432/support_copilot_record_test
+  RETRIEVAL_MINIMUM_SIMILARITY: "0.55"
+  RESOLUTION_MINIMUM_CONFIDENCE: "0.55"
+
+jobs:
+  record:
+    name: Record reviewable cassettes
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: ai-evaluation
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.1-pg17@sha256:3e8b3adfd27b5707128f60956f62a793c3c9326ea8cfaf0eab7adccb5d700b21
+        env:
+          POSTGRES_DB: support_copilot_record_test
+          POSTGRES_PASSWORD: support_copilot_record
+          POSTGRES_USER: support_copilot_record
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U support_copilot_record -d support_copilot_record_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Apply committed migrations
+        run: pnpm db:migrate
+      - name: Record knowledge-base embeddings
+        env:
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        run: pnpm ingest:record
+      - name: Record versioned evaluation responses
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          APP_VERSION: ${{ github.sha }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        run: pnpm eval:record -- --concurrency=3 --output=artifacts/eval-record-results.json
+      - name: Upload cassettes for human review
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: evaluation-cassettes-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            data/evals/cassettes
+            artifacts/eval-record-results.json
+          if-no-files-found: error
+          retention-days: 14

@@ -23,6 +23,7 @@ import {
   nearestRankPercentile,
 } from "@/evals/graders";
 import { CITATION_JUDGE_PROMPT_VERSION } from "@/evals/prompts/citation-judge.v1";
+import { isCassetteMissError } from "@/evals/replay";
 import { EVALUATION_THRESHOLD_VERSION, evaluateThresholds } from "@/evals/thresholds";
 import { isRetrievalError } from "@/retrieval/errors";
 import type { RetrievedEvidence } from "@/retrieval/types";
@@ -60,6 +61,7 @@ export type EvaluationDependencies = {
   judge: (
     execution: ResolutionExecution,
     traceId: string,
+    goldenCase: GoldenCase,
   ) => Promise<GenerateResult<CitationJudgeOutput> | null>;
 };
 
@@ -139,6 +141,7 @@ async function runCase(
       }),
     );
   } catch (error) {
+    if (isCassetteMissError(error)) throw error;
     const partial = {
       caseId: goldenCase.id,
       tags: goldenCase.tags,
@@ -166,9 +169,10 @@ async function runCase(
   let judge: GenerateResult<CitationJudgeOutput> | null = null;
   let judgeError: ReturnType<typeof safeCaseError> | null = null;
   try {
-    judge = await dependencies.judge(execution, traceId);
+    judge = await dependencies.judge(execution, traceId, goldenCase);
     if (judge) CitationJudgeOutputSchema.parse(judge.value);
   } catch (error) {
+    if (isCassetteMissError(error)) throw error;
     judgeError = safeCaseError(error, "judge");
   }
 

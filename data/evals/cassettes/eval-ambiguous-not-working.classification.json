@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-ambiguous-not-working",
+  "task": "classification",
+  "requestHash": "299d43d5d7fcf11be4804332f2987122a53bb77152be999381475a2a81959244",
+  "response": {
+    "value": {
+      "category": "technical",
+      "priority": "low",
+      "summary": "Customer reports a feature is not working but provided no error message, affected feature, device, or timeframe details.",
+      "confidence": 0.3
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

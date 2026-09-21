@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-account-reset-expired",
+  "task": "resolution",
+  "requestHash": "d86ff98f804985ca63896269356438d488c89b705d1f0ab6eccbc71de82e08fc",
+  "response": {
+    "value": {
+      "action": "reply",
+      "reason": "Knowledge confirms reset links expire after 30 minutes and a fresh one can be requested; safe to advise customer accordingly.",
+      "groundedReply": {
+        "suggestedResponse": "I'm sorry the link expired before you could use it. Password reset links are only valid for 30 minutes and can be used once. Please request a new reset email from the sign-in page and use it promptly within that 30-minute window. Also double-check that you're using the email address associated with your account and check your spam folder in case the new email is filtered there. If you've had several failed sign-in attempts recently, note that the account may be temporarily locked for 15 minutes—if so, please wait for that lock to clear before requesting or using a new reset link. Let us know if the issue continues after trying this.",
+        "citations": [
+          {
+            "chunkId": "cade9f89-399b-567c-ac75-e507db4e1c4d",
+            "sourceId": "account-access",
+            "section": "Account access recovery > Password reset",
+            "claim": "Reset links expire after 30 minutes, work once, and customer should check spam and confirm correct email address."
+          },
+          {
+            "chunkId": "75487afe-89a8-51cb-bd5d-da8fe1dca11b",
+            "sourceId": "account-access",
+            "section": "Account access recovery > Locked account",
+            "claim": "Multiple failed attempts can lock sign-in for 15 minutes; customer should wait before trying a fresh reset link."
+          }
+        ]
+      }
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

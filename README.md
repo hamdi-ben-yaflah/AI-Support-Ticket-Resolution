@@ -104,13 +104,27 @@ The ingestion command is deterministic and idempotent: unchanged sources are ski
 
 The repository includes a committed `golden.v2` dataset with 36 synthetic cases covering normal, edge, adversarial, ambiguous, contradictory, action-ready, and unanswerable scenarios.
 
-Run the shared evaluator with:
+The project uses a two-speed evaluation strategy. Pull requests run committed replay cassettes
+through the real classification, retrieval, grounding, grading, and reporting path without
+provider credentials or network calls. Nightly and manually dispatched workflows run the live
+providers. A prompt, model, schema, or input change alters the request hash and makes replay fail
+closed until a reviewed live run refreshes the cassettes.
+
+Run either mode with:
 
 ```bash
+pnpm eval:replay -- --concurrency=3 --output=artifacts/eval-replay-results.json
 pnpm eval -- --concurrency=3 --output=artifacts/eval-results.json
+pnpm eval:record -- --concurrency=3 --output=artifacts/eval-record-results.json
 ```
 
-The evaluator uses the same classification, retrieval, and resolution pipeline as the application. It records safe aggregate and per-case results, preserves dataset order, and gates on schema validity, category accuracy, retrieval recall, citation support, and abstention accuracy. It never stores ticket text, full prompts, drafts, provider payloads, vectors, or secrets.
+The evaluator uses the same classification, retrieval, and resolution pipeline as the application. It records safe aggregate and per-case results, preserves dataset order, and gates on schema validity, category accuracy, retrieval recall, citation support, and abstention accuracy. Evaluation reports and history never store ticket text, full prompts, drafts, provider payloads, vectors, or secrets. Committed replay cassettes contain only request hashes and the minimum schema-validated outputs or vectors needed for deterministic replay of synthetic data.
+
+Rate metrics report 95% Wilson confidence intervals. Proportion thresholds gate on the lower
+bound rather than the point estimate; average-of-ratios metrics, such as retrieval recall and
+citation support, remain explicitly interval-free. See
+[`docs/operations/evaluation-gating.md`](docs/operations/evaluation-gating.md) for cassette review,
+refresh, and failure procedures.
 
 For a local browser console, run `pnpm dev --hostname 127.0.0.1` with `ENABLE_LIVE_EVALUATIONS=true` and open [`/admin/evaluations`](http://localhost:3000/admin/evaluations). This is intentionally disabled in production and is not a production analytics dashboard.
 
@@ -135,11 +149,15 @@ pnpm test:integration   # requires TEST_DATABASE_URL ending in _test
 pnpm db:check           # verify migrations are consistent
 pnpm db:migrate         # apply Drizzle migrations
 pnpm ingest             # ingest synthetic Markdown knowledge
+pnpm ingest:replay      # ingest using committed, network-free embedding cassettes
 pnpm chunks:inspect     # inspect persisted chunks safely
+pnpm eval:replay -- --concurrency=3 --output=artifacts/eval-replay-results.json
 pnpm eval -- --concurrency=3 --output=artifacts/eval-results.json
+pnpm eval:record -- --concurrency=3 --output=artifacts/eval-record-results.json
 ```
 
-Unit tests are network-free. Live provider workflows are explicit and cost-bearing; they are not part of pull-request verification.
+Unit tests and the replay evaluation gate are network-free. Live provider workflows are explicit,
+cost-bearing, and remain outside pull-request verification.
 
 ### Browser journey verification
 

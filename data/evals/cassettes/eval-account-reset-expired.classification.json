@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-account-reset-expired",
+  "task": "classification",
+  "requestHash": "fefcf996c69b8fd361fb4619a935f526db6449e60f6405d4af724a43a3213204",
+  "response": {
+    "value": {
+      "category": "account",
+      "priority": "medium",
+      "summary": "Customer received password reset email but the link expired before they could use it, blocking account access.",
+      "confidence": 0.8
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

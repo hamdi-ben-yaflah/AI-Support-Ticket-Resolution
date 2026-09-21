@@ -27,6 +27,8 @@ function pair(): [PersistedEvaluationRun, PersistedEvaluationRun] {
     value: 29 / 30,
     numerator: 29,
     denominator: 30,
+    lowerBound: 0.833,
+    upperBound: 0.991,
   };
   candidate.metrics.operations.latencyP50Ms += 10;
   candidate.metrics.operations.cachedInputTokens += 1_200;

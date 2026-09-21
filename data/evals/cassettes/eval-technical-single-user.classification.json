@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-technical-single-user",
+  "task": "classification",
+  "requestHash": "b88c2950bb2f8e9e413e4dcfa900ede3bcda49638c73d6222770d6948883da61",
+  "response": {
+    "value": {
+      "category": "technical",
+      "priority": "low",
+      "summary": "A single user experiences an error in the web app while all other users can access it normally.",
+      "confidence": 0.7
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

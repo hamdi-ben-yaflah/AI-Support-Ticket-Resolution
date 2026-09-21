@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-duplicate-premium",
+  "task": "classification",
+  "requestHash": "0f6007180ccf1847fc2f99ef900a0a832b5b7a6b26b9b2fb2068cfe1ec17a35c",
+  "response": {
+    "value": {
+      "category": "billing",
+      "priority": "medium",
+      "summary": "Premium tier customer reports two settled charges with matching amounts and dates, possibly a duplicate charge.",
+      "confidence": 0.7
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

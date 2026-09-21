@@ -2,6 +2,8 @@ name: Live AI evaluation
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
 
 concurrency:
   group: live-ai-evaluation
@@ -14,6 +16,8 @@ env:
   NODE_VERSION: "24"
   PNPM_VERSION: "11.21.0"
   DATABASE_URL: postgresql://support_copilot_eval:support_copilot_eval@127.0.0.1:5432/support_copilot_eval_test
+  RETRIEVAL_MINIMUM_SIMILARITY: "0.55"
+  RESOLUTION_MINIMUM_CONFIDENCE: "0.55"
 
 jobs:
   evaluate:

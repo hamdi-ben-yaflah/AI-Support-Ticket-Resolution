@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-technical-browser-checks",
+  "task": "resolution",
+  "requestHash": "4b0d2bcf45eda0646e939c497b05bb3bb960fd9d94244c6ce0f16381711544f1",
+  "response": {
+    "value": {
+      "action": "reply",
+      "reason": "Knowledge chunk provides clear list of safe initial troubleshooting information and steps to request from the customer.",
+      "groundedReply": {
+        "suggestedResponse": "Thanks for reaching out. To help troubleshoot the issue, could you please provide the following details: the specific feature that's failing, the exact error message you're seeing, the approximate time it occurred, your browser type and version (or app version), and whether this issue affects only you or other users as well. In the meantime, could you also try retrying in a private/incognito browser window and temporarily disabling any browser extensions to see if that resolves the issue? This will help us narrow down the cause.",
+        "citations": [
+          {
+            "chunkId": "ee4d007b-a93e-5125-8386-ec07c786068a",
+            "sourceId": "technical-troubleshooting",
+            "section": "Common technical troubleshooting > Initial checks",
+            "claim": "Lists initial diagnostic details to collect (feature, error message, time, browser/app version, single vs multiple users) and initial steps (private browser window, disable extensions)."
+          }
+        ]
+      }
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

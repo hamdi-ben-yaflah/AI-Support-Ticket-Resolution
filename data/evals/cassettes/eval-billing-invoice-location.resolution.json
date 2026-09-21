@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-invoice-location",
+  "task": "resolution",
+  "requestHash": "05db8739424e527b9c59b57351aeb05400ab28077fdb8ad1f576a262e60a66b2",
+  "response": {
+    "value": {
+      "action": "reply",
+      "reason": "Knowledge chunk directly answers where to find invoices for completed payments.",
+      "groundedReply": {
+        "suggestedResponse": "You can download your invoice by going to Billing and then Payment history. Invoices become available once a payment reaches a completed state, so as long as your payment has completed, you should find it listed there with a download option. Note that pending payments do not yet have a final invoice available.",
+        "citations": [
+          {
+            "chunkId": "fe58e489-7d74-54b1-9df3-07068e9e7ed8",
+            "sourceId": "invoices-and-payments",
+            "section": "Invoices and payments > Finding an invoice",
+            "claim": "Invoices are found in Billing under Payment history and are available once a payment is completed; pending payments do not have a final invoice."
+          }
+        ]
+      }
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-technical-cache-problem",
+  "task": "classification",
+  "requestHash": "b750a06271ae9a693cf06cc8b44c9639636051397c3f71d464eaaa6e565ff7cf",
+  "response": {
+    "value": {
+      "category": "technical",
+      "priority": "low",
+      "summary": "Customer reports page displays outdated data after refresh, possibly due to a caching issue.",
+      "confidence": 0.7
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

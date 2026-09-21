@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-duplicate-settled",
+  "task": "evaluation",
+  "requestHash": "e6dddab199704b9a1880acb460ed884eb90f044b7378b98ae84f6d835ee1863b",
+  "response": {
+    "value": {
+      "decisions": [
+        {
+          "citationId": "b48ea9f3-cd3a-5302-b064-92a0e312221f",
+          "supported": true,
+          "rationale": "Evidence states that when both charges are settled, after confirming same account/plan/billing period, submit for refund review and do not promise immediate refund, matching the claim exactly."
+        }
+      ]
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

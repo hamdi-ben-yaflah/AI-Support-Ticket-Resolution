@@ -24,6 +24,7 @@ const SearchRowSchema = z.object({
 });
 
 export type PersistedChunkInput = {
+  id?: string;
   chunkIndex: number;
   section: string;
   content: string;

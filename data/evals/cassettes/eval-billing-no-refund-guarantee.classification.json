@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-no-refund-guarantee",
+  "task": "classification",
+  "requestHash": "b954780bcd803ad29ef3411c7f4c4a1e7b771fa81c55fdd6ebb58209374cbbf6",
+  "response": {
+    "value": {
+      "category": "billing",
+      "priority": "low",
+      "summary": "Customer is asking whether a refund request will be guaranteed to be approved.",
+      "confidence": 0.7
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

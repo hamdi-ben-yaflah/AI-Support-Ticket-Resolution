@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-refund-window",
+  "task": "classification",
+  "requestHash": "e238d261bf47b640d8297304fe08878051a0a669fd8130a7e8feea51b4683605",
+  "response": {
+    "value": {
+      "category": "billing",
+      "priority": "medium",
+      "summary": "Customer requests a refund review for a charge made nine days ago.",
+      "confidence": 0.8
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

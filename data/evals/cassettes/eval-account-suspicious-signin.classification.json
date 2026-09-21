@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-account-suspicious-signin",
+  "task": "classification",
+  "requestHash": "e1919fc933e482e665b503aceef606760f4adae40e97a6fe1408db14ddef04f7",
+  "response": {
+    "value": {
+      "category": "account",
+      "priority": "high",
+      "summary": "Customer reports an unexpected sign-in alert and an unrecognized active session, indicating possible unauthorized account access.",
+      "confidence": 0.75
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

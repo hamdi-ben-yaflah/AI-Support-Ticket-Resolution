@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-upgrade-proration",
+  "task": "resolution",
+  "requestHash": "d039ea18bb60746199e2982e4abea07bb79949a209a17aeb4d13466ceafeb77f",
+  "response": {
+    "value": {
+      "action": "reply",
+      "reason": "Ticket asks for clarification on how proration/credit works after an upgrade; knowledge chunk directly explains this, so a factual reply is appropriate without needing a refund review.",
+      "groundedReply": {
+        "suggestedResponse": "Thanks for reaching out! When you upgrade your plan, the change takes effect immediately. Your account receives a credit for the unused portion of your previous plan, and you're charged a prorated amount for the new plan covering the time remaining in your current billing cycle. This is why you may see both a credit and a new charge reflected on your account. If you'd like, I can look into the specific amounts on your account—just let me know if you have any further questions!",
+        "citations": [
+          {
+            "chunkId": "73d60010-1d46-5e0e-a6a9-56a0021fb750",
+            "sourceId": "subscription-changes",
+            "section": "Subscription changes > Upgrades",
+            "claim": "Upgrades take effect immediately, with credit for unused portion of previous plan and a prorated charge for the new plan through the current billing date."
+          }
+        ]
+      }
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-refund-information",
+  "task": "classification",
+  "requestHash": "2b3118927d31591f1f7d848ffb882bda57d9da7cdf2c106c26e95671ceeaf1d4",
+  "response": {
+    "value": {
+      "category": "billing",
+      "priority": "low",
+      "summary": "Customer asks what information is needed to review a recent charge for a possible refund.",
+      "confidence": 0.7
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

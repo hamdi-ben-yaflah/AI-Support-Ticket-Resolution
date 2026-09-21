@@ -10,6 +10,8 @@ import { parseGoldenDataset } from "@/evals/dataset";
 import { aggregateQualityMetrics, gradeExecution, nearestRankPercentile } from "@/evals/graders";
 import { judgeCitations } from "@/evals/judge";
 import { runEvaluation } from "@/evals/runner";
+import { wilsonScoreInterval } from "@/evals/statistics";
+import { evaluateThresholds } from "@/evals/thresholds";
 import {
   evaluationChunkId,
   evaluationTraceId,
@@ -86,6 +88,15 @@ describe("evaluation CLI options", () => {
 });
 
 describe("evaluation graders", () => {
+  it("computes a bounded 95% Wilson interval", () => {
+    expect(wilsonScoreInterval(33, 36)).toEqual({
+      lowerBound: expect.closeTo(0.7817330875072737, 12),
+      upperBound: expect.closeTo(0.9712513886640066, 12),
+    });
+    expect(wilsonScoreInterval(0, 0)).toBeNull();
+    expect(() => wilsonScoreInterval(2, 1)).toThrow("invalid");
+  });
+
   it("uses explicit denominators and nearest-rank percentiles", () => {
     const result = {
       caseId: "eval-case-one",
@@ -131,10 +142,64 @@ describe("evaluation graders", () => {
       passed: false,
     };
     const metrics = aggregateQualityMetrics([result]);
-    expect(metrics.retrievalRecallAt5).toEqual({ value: 0.5, numerator: 0.5, denominator: 1 });
+    expect(metrics.retrievalRecallAt5).toEqual({
+      value: 0.5,
+      numerator: 0.5,
+      denominator: 1,
+      lowerBound: null,
+      upperBound: null,
+    });
     expect(metrics.abstentionPrecision.value).toBeNull();
     expect(nearestRankPercentile([40, 10, 30, 20], 0.5)).toBe(20);
     expect(nearestRankPercentile([40, 10, 30, 20], 0.95)).toBe(40);
+  });
+
+  it("gates binomial metrics on their conservative lower bound", () => {
+    const metrics = aggregateQualityMetrics([
+      {
+        caseId: "eval-case-one",
+        tags: ["test"],
+        expected: makeGoldenCases(1)[0]!.expected,
+        actual: null,
+        scores: {
+          schemaValid: true,
+          categoryCorrect: true,
+          priorityCorrect: true,
+          actionCorrect: true,
+          abstentionCorrect: true,
+          retrievalRecallAt5: 1,
+          citationExistence: 1,
+          citationSupport: 1,
+        },
+        judgeDecisions: [],
+        telemetry: {
+          latencyMs: 0,
+          generationInputTokens: 0,
+          generationOutputTokens: 0,
+          generationCachedInputTokens: 0,
+          generationCacheWriteTokens: 0,
+          judgeInputTokens: 0,
+          judgeOutputTokens: 0,
+          judgeCachedInputTokens: 0,
+          judgeCacheWriteTokens: 0,
+          retryCount: 0,
+        },
+        error: null,
+        passed: true,
+      },
+    ]);
+
+    const gates = evaluateThresholds(metrics);
+    expect(gates.find(({ metric }) => metric === "schemaValidity")).toMatchObject({
+      actual: 1,
+      lowerBound: expect.closeTo(0.20654931437723745, 12),
+      passed: false,
+    });
+    expect(gates.find(({ metric }) => metric === "retrievalRecallAt5")).toMatchObject({
+      actual: 1,
+      lowerBound: null,
+      passed: true,
+    });
   });
 });
 

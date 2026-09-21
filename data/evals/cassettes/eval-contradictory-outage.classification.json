@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-contradictory-outage",
+  "task": "classification",
+  "requestHash": "2ce8ac60c92f86c1e5e9ba18b505c253496b5b6f2f45898731fbc2f31b7adbd3",
+  "response": {
+    "value": {
+      "category": "technical",
+      "priority": "medium",
+      "summary": "Customer reports contradictory information: claims service is unusable for all users while also stating all features work normally for everyone.",
+      "confidence": 0.3
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

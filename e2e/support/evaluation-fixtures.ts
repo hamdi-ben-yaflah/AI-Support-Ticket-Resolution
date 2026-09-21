@@ -14,7 +14,8 @@ export type EvaluationFixtures = {
 };
 
 function metric(numerator: number, denominator = 30) {
-  return { value: numerator / denominator, numerator, denominator };
+  const value = numerator / denominator;
+  return { value, numerator, denominator, lowerBound: null, upperBound: null };
 }
 
 function makeReport(runId: string): EvaluationReport {
@@ -138,12 +139,13 @@ function makeReport(runId: string): EvaluationReport {
         estimatedCostUsd: null,
       },
     },
-    thresholdVersion: "evaluation-thresholds.v1",
+    thresholdVersion: "evaluation-thresholds.v2",
     thresholds: [
       {
         metric: "schemaValidity",
         threshold: 0.95,
         actual: 1,
+        lowerBound: 0.886,
         passed: true,
       },
     ],

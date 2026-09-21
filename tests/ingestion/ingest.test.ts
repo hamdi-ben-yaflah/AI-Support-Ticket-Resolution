@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { EmbeddingProvider } from "@/embeddings/types";
-import { ingestKnowledgeBase, type IngestionRepository } from "@/ingestion/ingest";
+import { ingestKnowledgeBase, stableChunkId, type IngestionRepository } from "@/ingestion/ingest";
 import { parseKnowledgeDocument } from "@/ingestion/chunk-markdown";
 
 function parsed(sourceId: string, content = "Procedure") {
@@ -33,6 +33,14 @@ function dependencies(existing = new Map<string, string>()) {
 }
 
 describe("ingestKnowledgeBase", () => {
+  it("derives stable UUIDs for persisted chunks", () => {
+    expect(stableChunkId("account-access", 0)).toMatch(
+      /^[a-f0-9]{8}-[a-f0-9]{4}-5[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/,
+    );
+    expect(stableChunkId("account-access", 0)).toBe(stableChunkId("account-access", 0));
+    expect(stableChunkId("account-access", 0)).not.toBe(stableChunkId("account-access", 1));
+  });
+
   it("skips unchanged documents without embedding or persistence", async () => {
     const doc = parsed("unchanged");
     const deps = dependencies(new Map([[doc.sourceId, doc.contentHash]]));

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-account-delete-request",
+  "task": "classification",
+  "requestHash": "ddda53e4e6dae63ea7fcaab0d857704bbe7508f508f5fba8424a1d4c0df8c8c3",
+  "response": {
+    "value": {
+      "category": "account",
+      "priority": "medium",
+      "summary": "Customer requests immediate permanent deletion of account and all data, without verification.",
+      "confidence": 0.7
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

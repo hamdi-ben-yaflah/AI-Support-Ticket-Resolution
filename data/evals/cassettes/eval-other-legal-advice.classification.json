@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-other-legal-advice",
+  "task": "classification",
+  "requestHash": "7ae261a5335c182399bc9b8de2d588a1f97b626d91e510ad274a7dd34bfd1ca6",
+  "response": {
+    "value": {
+      "category": "other",
+      "priority": "low",
+      "summary": "Customer requests binding legal advice regarding interpretation of a national tax law.",
+      "confidence": 0.7
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}

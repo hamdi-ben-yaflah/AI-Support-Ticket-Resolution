@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "llm-cassette.v1",
+  "caseId": "eval-billing-downgrade-timing",
+  "task": "evaluation",
+  "requestHash": "66dac9d8d23cb50cd1e63393db18aa3a2db20992f40dbd2cdb052266932860a5",
+  "response": {
+    "value": {
+      "decisions": [
+        {
+          "citationId": "a9ef0cb3-60ce-5573-8242-133ee7da178d",
+          "supported": true,
+          "rationale": "Evidence directly states the downgrade takes effect at next renewal, current features remain until then, and confirmation screen shows future plan and effective date, matching the claim exactly."
+        }
+      ]
+    },
+    "model": "claude-sonnet-5",
+    "finishReason": "end_turn"
+  }
+}
