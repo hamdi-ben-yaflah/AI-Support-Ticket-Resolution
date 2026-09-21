@@ -35,7 +35,11 @@ import { retrieveEvidence } from "@/retrieval/search";
 export type EvaluationMode = "live" | "record" | "replay";
 
 type EvaluationProviders = {
-  llm: ScopedProvider<LlmProvider>;
+  llm: {
+    classification: ScopedProvider<LlmProvider>;
+    resolution: ScopedProvider<LlmProvider>;
+    judge: ScopedProvider<LlmProvider>;
+  };
   embeddings: ScopedProvider<EmbeddingProvider>;
   pricing: EvaluationPricing;
   logLevel: "fatal" | "error" | "warn" | "info" | "debug" | "trace" | "silent";
@@ -49,7 +53,11 @@ async function createProviders(mode: EvaluationMode): Promise<EvaluationProvider
   if (mode === "replay") {
     const manifest = await loadCassetteManifest();
     return {
-      llm: createReplayLlmProvider(manifest.llm.model),
+      llm: {
+        classification: createReplayLlmProvider(manifest.llm.models.classification),
+        resolution: createReplayLlmProvider(manifest.llm.models.resolution),
+        judge: createReplayLlmProvider(manifest.llm.models.judge),
+      },
       embeddings: createReplayEmbeddingProvider(
         manifest.embeddings.model,
         manifest.embeddings.dimensions,
@@ -62,13 +70,24 @@ async function createProviders(mode: EvaluationMode): Promise<EvaluationProvider
 
   const ai = getAiConfig();
   const embedding = getEmbeddingConfig();
-  const liveLlm = new AnthropicLlmProvider({
-    apiKey: ai.anthropicApiKey,
-    model: ai.model,
-    timeoutMs: ai.requestTimeoutMs,
-    maxRetries: ai.maxRetries,
-    promptCacheEnabled: ai.promptCacheEnabled,
-  });
+  const createLlm = (model: string) =>
+    new AnthropicLlmProvider({
+      apiKey: ai.anthropicApiKey,
+      model,
+      timeoutMs: ai.requestTimeoutMs,
+      maxRetries: ai.maxRetries,
+      promptCacheEnabled: ai.promptCacheEnabled,
+    });
+  const liveLlm = {
+    classification: createLlm(ai.models.classification),
+    resolution: createLlm(ai.models.resolution),
+    judge: createLlm(ai.models.judge),
+  };
+  const pricing =
+    new Set([liveLlm.classification.model, liveLlm.resolution.model, liveLlm.judge.model]).size ===
+    1
+      ? getEvaluationPricing()
+      : null;
   const liveEmbeddings = new VoyageEmbeddingProvider({
     apiKey: embedding.apiKey,
     model: embedding.model,
@@ -78,17 +97,27 @@ async function createProviders(mode: EvaluationMode): Promise<EvaluationProvider
   });
   if (mode === "live") {
     return {
-      llm: Object.assign(liveLlm, { forCase: () => liveLlm }),
+      llm: {
+        classification: Object.assign(liveLlm.classification, {
+          forCase: () => liveLlm.classification,
+        }),
+        resolution: Object.assign(liveLlm.resolution, { forCase: () => liveLlm.resolution }),
+        judge: Object.assign(liveLlm.judge, { forCase: () => liveLlm.judge }),
+      },
       embeddings: Object.assign(liveEmbeddings, { forCase: () => liveEmbeddings }),
-      pricing: getEvaluationPricing(),
+      pricing,
       logLevel: ai.logLevel,
     };
   }
 
   return {
-    llm: createRecordingLlmProvider(liveLlm),
+    llm: {
+      classification: createRecordingLlmProvider(liveLlm.classification),
+      resolution: createRecordingLlmProvider(liveLlm.resolution),
+      judge: createRecordingLlmProvider(liveLlm.judge),
+    },
     embeddings: createRecordingEmbeddingProvider(liveEmbeddings),
-    pricing: getEvaluationPricing(),
+    pricing,
     logLevel: ai.logLevel,
   };
 }
@@ -108,8 +137,15 @@ export async function runConfiguredEvaluation(concurrency = 3, mode: EvaluationM
     if (mode === "record") {
       const embedding = getEmbeddingConfig();
       await writeCassetteManifest({
-        schemaVersion: "cassette-manifest.v1",
-        llm: { provider: "anthropic", model: providers.llm.model },
+        schemaVersion: "cassette-manifest.v2",
+        llm: {
+          provider: "anthropic",
+          models: {
+            classification: providers.llm.classification.model,
+            resolution: providers.llm.resolution.model,
+            judge: providers.llm.judge.model,
+          },
+        },
         embeddings: {
           provider: "voyage",
           model: embedding.model,
@@ -122,7 +158,8 @@ export async function runConfiguredEvaluation(concurrency = 3, mode: EvaluationM
     const log = createLogger(providers.logLevel);
     const dependencies: EvaluationDependencies = {
       execute: (goldenCase, context) => {
-        const provider = providers.llm.forCase(goldenCase.id);
+        const classificationProvider = providers.llm.classification.forCase(goldenCase.id);
+        const resolutionProvider = providers.llm.resolution.forCase(goldenCase.id);
         const embedder = providers.embeddings.forCase(goldenCase.id);
         const retriever = {
           retrieve: async (retrievalInput: Parameters<typeof retrieveEvidence>[0]) => {
@@ -138,13 +175,13 @@ export async function runConfiguredEvaluation(concurrency = 3, mode: EvaluationM
         };
         return resolveTicket(goldenCase.ticket, {
           traceId: context.traceId,
-          provider,
+          provider: resolutionProvider,
           retriever,
           policy: resolutionPolicy,
           classifier: (ticket, classificationContext) =>
             classifyTicketWithMetadata(ticket, {
               ...classificationContext,
-              provider,
+              provider: classificationProvider,
               log,
             }),
           log,
@@ -153,7 +190,7 @@ export async function runConfiguredEvaluation(concurrency = 3, mode: EvaluationM
       judge: (execution, traceId, goldenCase) =>
         judgeCitations({
           execution,
-          provider: providers.llm.forCase(goldenCase.id),
+          provider: providers.llm.judge.forCase(goldenCase.id),
           traceId,
         }),
     };
@@ -163,8 +200,12 @@ export async function runConfiguredEvaluation(concurrency = 3, mode: EvaluationM
       concurrency,
       dependencies,
       runtime: {
-        provider: providers.llm.name,
-        model: providers.llm.model,
+        provider: providers.llm.resolution.name,
+        models: {
+          classification: providers.llm.classification.model,
+          resolution: providers.llm.resolution.model,
+          judge: providers.llm.judge.model,
+        },
         promptVersions: {
           classification: CLASSIFICATION_PROMPT_VERSION,
           resolution: RESOLUTION_PROMPT_VERSION,

@@ -27,7 +27,10 @@ export async function persistSuccessfulResolution(raw: PersistedResolutionRun): 
         ticketHash: input.ticketHash,
         promptVersions: input.metadata.promptVersions,
         provider: input.metadata.provider,
-        model: input.metadata.model,
+        models: input.metadata.models ?? {
+          classification: input.metadata.model!,
+          resolution: input.metadata.model!,
+        },
         resultStatus: "success",
         classification: input.classification,
         action: input.action,

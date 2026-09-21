@@ -90,6 +90,7 @@ function makeReport(runId: string): EvaluationReport {
     abstentionAccuracy: metric(30),
     abstentionPrecision: metric(30),
     abstentionRecall: metric(30),
+    abstentionRate: metric(0),
   };
 
   return {

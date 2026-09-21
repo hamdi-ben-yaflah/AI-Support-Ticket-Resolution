@@ -120,6 +120,9 @@ export function aggregateQualityMetrics(
     abstentionAccuracy: booleanMetric(results.map((result) => result.scores.abstentionCorrect)),
     abstentionPrecision: abstentionMetric(results, "precision"),
     abstentionRecall: abstentionMetric(results, "recall"),
+    abstentionRate: booleanMetric(
+      results.map((result) => result.actual?.action === "needs_human_review"),
+    ),
   };
 }
 

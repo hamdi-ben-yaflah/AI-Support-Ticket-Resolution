@@ -78,7 +78,9 @@ pnpm install
 cp .env.example .env.local
 ```
 
-Set `ANTHROPIC_API_KEY`, `LLM_MODEL`, `VOYAGE_API_KEY`, and a random `SESSION_COOKIE_SECRET` of at least 32 characters. The remaining local defaults are documented in `.env.example`.
+Set `ANTHROPIC_API_KEY`, `LLM_MODEL`, `VOYAGE_API_KEY`, and a random `SESSION_COOKIE_SECRET` of at least 32 characters. `LLM_MODEL` is the safe shared default; set `LLM_MODEL_CLASSIFICATION`, `LLM_MODEL_RESOLUTION`, or `LLM_MODEL_JUDGE` only when you want an explicit, static per-task binding. The remaining local defaults are documented in `.env.example`.
+
+Model bindings are intentionally static: classification, resolution, and evaluation judging each receive a configured model, with empty task overrides falling back to `LLM_MODEL`. There is no runtime model fallback or quality-based routing. See [model routing operations](docs/operations/model-routing.md) for rollout, cost, and rollback guidance.
 
 Start PostgreSQL with pgvector, migrate the schema, and ingest the synthetic knowledge base:
 

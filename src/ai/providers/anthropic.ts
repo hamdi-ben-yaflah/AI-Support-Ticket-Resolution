@@ -4,6 +4,7 @@ import type { TextBlockParam } from "@anthropic-ai/sdk/resources/messages";
 import Anthropic, {
   APIConnectionError,
   APIConnectionTimeoutError,
+  AnthropicError,
   APIError,
   APIUserAbortError,
   AuthenticationError,
@@ -138,6 +139,20 @@ function mapAnthropicError(error: unknown, retryCount: number): LlmError {
       retryCount,
       cause: error,
       ...metadata,
+    });
+  }
+
+  // The SDK parses structured output inside messages.parse(). A malformed JSON/schema
+  // response is surfaced as AnthropicError before our normalized response validation
+  // runs. Treat that provider-side parse failure as retryable invalid output: a bounded
+  // retry can receive a valid structured response, while the final error remains safe
+  // and does not fall back to another model.
+  if (error instanceof AnthropicError) {
+    return new LlmError("invalid_output", "The model returned invalid structured output.", {
+      retryable: true,
+      retryCount,
+      ...metadata,
+      cause: error,
     });
   }
 

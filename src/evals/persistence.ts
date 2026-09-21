@@ -14,7 +14,7 @@ export function reportToPersistedRun(raw: EvaluationReport): PersistedEvaluation
     completedAt: report.completedAt,
     dataset: report.dataset,
     runtime: report.runtime,
-    judgeModel: report.runtime.model,
+    judgeModel: report.runtime.models?.judge ?? report.runtime.model ?? "legacy",
     metrics: report.metrics,
     thresholdVersion: report.thresholdVersion,
     thresholds: report.thresholds,

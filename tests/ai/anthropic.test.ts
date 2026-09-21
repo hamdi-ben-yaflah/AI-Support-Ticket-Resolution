@@ -1,4 +1,8 @@
-import Anthropic, { APIConnectionError, APIConnectionTimeoutError } from "@anthropic-ai/sdk";
+import Anthropic, {
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  AnthropicError,
+} from "@anthropic-ai/sdk";
 import { describe, expect, it, vi } from "vitest";
 
 import { LlmError } from "@/ai/errors";
@@ -291,6 +295,19 @@ describe("AnthropicLlmProvider", () => {
         },
       },
     ]);
+  });
+
+  it("retries SDK structured-output parse errors within the configured cap", async () => {
+    const parse = vi
+      .fn()
+      .mockRejectedValueOnce(new AnthropicError("malformed structured output"))
+      .mockResolvedValueOnce(message());
+
+    const result = await provider(parse, 2).generateStructured(request);
+
+    expect(result.value.category).toBe("billing");
+    expect(result.retryCount).toBe(1);
+    expect(parse).toHaveBeenCalledTimes(2);
   });
 
   it("uses only the remaining operation deadline for a transient retry", async () => {

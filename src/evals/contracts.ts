@@ -98,7 +98,15 @@ const CompactActualSchema = z
     retrievedChunkIds: z.array(z.string().uuid()).max(8),
     retrievedSourceIds: UniqueStringsSchema.max(8),
     provider: z.string().trim().min(1).max(120),
-    model: z.string().trim().min(1).max(200),
+    models: z
+      .object({
+        classification: z.string().trim().min(1).max(200),
+        resolution: z.string().trim().min(1).max(200),
+      })
+      .strict()
+      .optional(),
+    /** @deprecated Legacy reports are read for comparison only. */
+    model: z.string().trim().min(1).max(200).optional(),
     promptVersions: z
       .object({
         classification: z.string().trim().min(1).max(120),
@@ -154,6 +162,14 @@ export const EvaluationCaseResultSchema = z
         latencyMs: z.number().int().nonnegative(),
         generationInputTokens: z.number().int().nonnegative(),
         generationOutputTokens: z.number().int().nonnegative(),
+        classificationInputTokens: z.number().int().nonnegative().optional(),
+        classificationOutputTokens: z.number().int().nonnegative().optional(),
+        classificationCachedInputTokens: z.number().int().nonnegative().optional(),
+        classificationCacheWriteTokens: z.number().int().nonnegative().optional(),
+        resolutionInputTokens: z.number().int().nonnegative().optional(),
+        resolutionOutputTokens: z.number().int().nonnegative().optional(),
+        resolutionCachedInputTokens: z.number().int().nonnegative().optional(),
+        resolutionCacheWriteTokens: z.number().int().nonnegative().optional(),
         generationCachedInputTokens: z.number().int().nonnegative().default(0),
         generationCacheWriteTokens: z.number().int().nonnegative().default(0),
         judgeInputTokens: z.number().int().nonnegative(),
@@ -211,6 +227,13 @@ export const EvaluationQualityMetricsSchema = z
     abstentionAccuracy: EvaluationMetricSchema,
     abstentionPrecision: EvaluationMetricSchema,
     abstentionRecall: EvaluationMetricSchema,
+    abstentionRate: EvaluationMetricSchema.optional().default({
+      value: null,
+      numerator: 0,
+      denominator: 0,
+      lowerBound: null,
+      upperBound: null,
+    }),
   })
   .strict();
 
@@ -239,7 +262,16 @@ export const EvaluationReportSchema = z
     runtime: z
       .object({
         provider: z.string().trim().min(1).max(120),
-        model: z.string().trim().min(1).max(200),
+        models: z
+          .object({
+            classification: z.string().trim().min(1).max(200),
+            resolution: z.string().trim().min(1).max(200),
+            judge: z.string().trim().min(1).max(200),
+          })
+          .strict()
+          .optional(),
+        /** @deprecated Legacy reports are read for comparison only. */
+        model: z.string().trim().min(1).max(200).optional(),
         promptVersions: z
           .object({
             classification: z.string().trim().min(1).max(120),

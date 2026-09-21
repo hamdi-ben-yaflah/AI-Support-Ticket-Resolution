@@ -95,8 +95,15 @@ function createExecutionMetadata(input: {
   pipelineStartedAt: number;
   generated?: GenerateResult<ResolutionDecision>;
   resolutionProvider?: LlmProvider;
+  resolutionModel?: string;
 }): ResolutionRunMetadata {
   const generated = input.generated;
+  const classificationModel = input.classified.metadata.model;
+  const resolutionModel =
+    generated?.model ??
+    input.resolutionProvider?.model ??
+    input.resolutionModel ??
+    classificationModel;
   return {
     promptVersions: {
       classification: input.classified.metadata.promptVersion,
@@ -106,7 +113,25 @@ function createExecutionMetadata(input: {
     provider: generated
       ? (input.resolutionProvider?.name ?? input.classified.metadata.provider)
       : input.classified.metadata.provider,
-    model: generated?.model ?? input.classified.metadata.model,
+    models: {
+      classification: classificationModel,
+      resolution: resolutionModel,
+    },
+    ...(classificationModel === resolutionModel ? { model: classificationModel } : {}),
+    taskUsage: {
+      classification: {
+        inputTokens: input.classified.metadata.inputTokens,
+        outputTokens: input.classified.metadata.outputTokens,
+        cachedInputTokens: input.classified.metadata.cachedInputTokens,
+        cacheWriteInputTokens: input.classified.metadata.cacheWriteInputTokens,
+      },
+      resolution: {
+        inputTokens: generated?.usage.inputTokens ?? 0,
+        outputTokens: generated?.usage.outputTokens ?? 0,
+        cachedInputTokens: generated?.usage.cachedInputTokens ?? 0,
+        cacheWriteInputTokens: generated?.usage.cacheWriteInputTokens ?? 0,
+      },
+    },
     latencyMs: Math.max(0, Date.now() - input.pipelineStartedAt),
     inputTokens: input.classified.metadata.inputTokens + (generated?.usage.inputTokens ?? 0),
     outputTokens: input.classified.metadata.outputTokens + (generated?.usage.outputTokens ?? 0),
@@ -147,6 +172,7 @@ function abstain(input: {
   policy: ResolutionPolicy;
   reason: string;
   pipelineStartedAt: number;
+  resolutionModel: string;
 }): ResolutionExecution {
   const proposal = ResolutionProposalSchema.parse({
     ...input.classification,
@@ -317,6 +343,7 @@ export async function resolveTicket(
       policy: options.policy,
       reason: LOW_CONFIDENCE_REASON,
       pipelineStartedAt,
+      resolutionModel: options.provider.model,
     });
     logAbstention(
       log,
@@ -349,6 +376,7 @@ export async function resolveTicket(
       policy: options.policy,
       reason: INSUFFICIENT_EVIDENCE_REASON,
       pipelineStartedAt,
+      resolutionModel: options.provider.model,
     });
     logAbstention(
       log,
@@ -595,7 +623,15 @@ export async function resolveTicketWithConfiguredProviders(
   const log = createLogger(config.logLevel);
   const provider = new AnthropicLlmProvider({
     apiKey: config.anthropicApiKey,
-    model: config.model,
+    model: config.models.resolution,
+    timeoutMs: config.requestTimeoutMs,
+    maxRetries: config.maxRetries,
+    promptCacheEnabled: config.promptCacheEnabled,
+    tracing,
+  });
+  const classificationProvider = new AnthropicLlmProvider({
+    apiKey: config.anthropicApiKey,
+    model: config.models.classification,
     timeoutMs: config.requestTimeoutMs,
     maxRetries: config.maxRetries,
     promptCacheEnabled: config.promptCacheEnabled,
@@ -624,7 +660,7 @@ export async function resolveTicketWithConfiguredProviders(
     classifier: (ticket, classificationContext) =>
       classifyTicketWithMetadata(ticket, {
         ...classificationContext,
-        provider,
+        provider: classificationProvider,
         log,
         tracing,
       }),

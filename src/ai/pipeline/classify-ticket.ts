@@ -216,7 +216,7 @@ export async function classifyTicketWithConfiguredProvider(
 
   const provider = new AnthropicLlmProvider({
     apiKey: config.anthropicApiKey,
-    model: config.model,
+    model: config.models.classification,
     timeoutMs: config.requestTimeoutMs,
     maxRetries: config.maxRetries,
     promptCacheEnabled: config.promptCacheEnabled,
